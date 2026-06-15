@@ -6,12 +6,15 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
@@ -20,7 +23,9 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import javax.net.ssl.HttpsURLConnection;
@@ -211,6 +216,106 @@ public class HTTPRequest {
 				}
 			}
 			catch(Exception e) {
+				Log.e(TAG, null != e.getMessage() ? e.getMessage() : "");
+			}
+		}
+
+		Log.d(TAG, "HTTP Status : " + status + " ; JSON : " + result);
+		return new HTTPResponse(status, result.toString());
+	}
+
+	public static HTTPResponse postMultipart(String url, HashMap<String, String> data, HashMap<String, String> headers, String fileFieldName, List<byte[]> files) {
+		final String boundary = "osimatic_boundary_" + System.currentTimeMillis();
+		final String lineEnd = "\r\n";
+		final String twoHyphens = "--";
+		StringBuilder result = new StringBuilder();
+		int status = 0;
+		OutputStream outputStream = null;
+		BufferedReader reader = null;
+
+		try {
+			// construction du corps multipart en mémoire
+			ByteArrayOutputStream bodyStream = new ByteArrayOutputStream();
+
+			// champs texte
+			if (null != data) {
+				for (Map.Entry<String, String> entry : data.entrySet()) {
+					String value = (null != entry.getValue() ? entry.getValue() : "");
+					bodyStream.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(("Content-Disposition: form-data; name=\"" + entry.getKey() + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(("Content-Type: text/plain; charset=UTF-8" + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(value.getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+				}
+			}
+
+			// fichiers binaires
+			if (null != files) {
+				int index = 0;
+				for (byte[] fileBytes : files) {
+					if (null == fileBytes) {
+						continue;
+					}
+					String filename = "photo_" + index + ".jpg";
+					bodyStream.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(("Content-Disposition: form-data; name=\"" + fileFieldName + "[]\"; filename=\"" + filename + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(("Content-Type: image/jpeg" + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(("Content-Transfer-Encoding: binary" + lineEnd).getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+					bodyStream.write(fileBytes);
+					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+					index++;
+				}
+			}
+
+			// fermeture boundary
+			bodyStream.write((twoHyphens + boundary + twoHyphens + lineEnd).getBytes(StandardCharsets.UTF_8));
+			byte[] bodyBytes = bodyStream.toByteArray();
+
+			Log.d(TAG, "URL : " + url + " ; multipart body size : " + bodyBytes.length + " bytes");
+
+			// ouverture de la connexion
+			URL urlObj = new URL(url);
+			HttpURLConnection conn = (HttpURLConnection) urlObj.openConnection();
+			conn.setDoOutput(true);
+			conn.setRequestMethod("POST");
+			conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+			conn.setRequestProperty("Content-Length", String.valueOf(bodyBytes.length));
+			HTTPRequest.setHttpHeaders(conn, headers);
+
+			// envoi du corps
+			outputStream = conn.getOutputStream();
+			outputStream.write(bodyBytes);
+			outputStream.flush();
+
+			// lecture de la réponse
+			status = conn.getResponseCode();
+			InputStream is = (status >= HttpURLConnection.HTTP_BAD_REQUEST) ? conn.getErrorStream() : conn.getInputStream();
+			reader = new BufferedReader(new InputStreamReader(is));
+			String ligne;
+			while (null != (ligne = reader.readLine())) {
+				result.append(ligne);
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			try {
+				if (null != outputStream) {
+					outputStream.close();
+				}
+			}
+			catch (Exception e) {
+				Log.e(TAG, null != e.getMessage() ? e.getMessage() : "");
+			}
+			try {
+				if (null != reader) {
+					reader.close();
+				}
+			}
+			catch (Exception e) {
 				Log.e(TAG, null != e.getMessage() ? e.getMessage() : "");
 			}
 		}
