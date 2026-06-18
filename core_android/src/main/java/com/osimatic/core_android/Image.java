@@ -12,8 +12,11 @@ import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 
+import androidx.core.content.FileProvider;
+
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -234,6 +237,33 @@ public class Image {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Prepares a full-resolution camera {@link Intent} using a {@link FileProvider} URI as output.
+	 *
+	 * <p>Creates a temporary JPEG file in {@code context.getCacheDir()/cacheSubDir}, obtains a
+	 * {@link FileProvider} URI for it, and sets it as {@link MediaStore#EXTRA_OUTPUT} on the intent.
+	 * The returned URI must be used to read the bitmap after the camera activity completes.
+	 *
+	 * @param context           the context; must not be {@code null}
+	 * @param intent            the {@link MediaStore#ACTION_IMAGE_CAPTURE} intent to configure; must not be {@code null}
+	 * @param fileProviderAuthority the FileProvider authority declared in AndroidManifest.xml
+	 * @param cacheSubDir       subdirectory name inside {@code getCacheDir()} for the temp file
+	 * @return the {@link Uri} where the camera will write the photo, or {@code null} on failure
+	 */
+	public static Uri prepareCameraIntent(Context context, Intent intent, String fileProviderAuthority, String cacheSubDir) {
+		try {
+			File dir = new File(context.getCacheDir(), cacheSubDir);
+			dir.mkdirs();
+			File photoFile = File.createTempFile("photo_", ".jpg", dir);
+			Uri photoUri = FileProvider.getUriForFile(context, fileProviderAuthority, photoFile);
+			intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+			return photoUri;
+		} catch (IOException e) {
+			Log.e(TAG, "Erreur création fichier photo temporaire", e);
+			return null;
+		}
 	}
 
 	// =============================================================================================
