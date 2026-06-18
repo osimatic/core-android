@@ -1,5 +1,6 @@
 package com.osimatic.core_android;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -11,6 +12,8 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.core.content.FileProvider;
 
@@ -22,6 +25,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -263,6 +267,52 @@ public class Image {
 		} catch (IOException e) {
 			Log.e(TAG, "Erreur création fichier photo temporaire", e);
 			return null;
+		}
+	}
+
+	// =============================================================================================
+	// UI helpers
+	// =============================================================================================
+
+	/**
+	 * Crée un {@link ImageView} stylisé, l'ajoute dans le {@code container} et charge l'image depuis {@code url} en thread de fond.
+	 *
+	 * @param activity  l'activity courante (pour {@code runOnUiThread}) ; doit être non-null
+	 * @param container le {@link LinearLayout} horizontal dans lequel ajouter l'image
+	 * @param url       l'URL de l'image à télécharger
+	 */
+	public static void addImageFromUrl(Activity activity, LinearLayout container, String url) {
+		ImageView imageView = new ImageView(activity);
+		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+			LinearLayout.LayoutParams.WRAP_CONTENT,
+			LinearLayout.LayoutParams.MATCH_PARENT
+		);
+		params.setMarginEnd(8);
+		imageView.setLayoutParams(params);
+		imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		imageView.setAdjustViewBounds(true);
+		container.addView(imageView);
+		new Thread(() -> {
+			Bitmap bm = fetchBitmap(url);
+			if (null != bm) {
+				activity.runOnUiThread(() -> imageView.setImageBitmap(bm));
+			}
+		}).start();
+	}
+
+	/**
+	 * Charge chaque URL de {@code urls} dans le {@code container} via {@link #addImageFromUrl}.
+	 *
+	 * @param activity  l'activity courante ; doit être non-null
+	 * @param container le {@link LinearLayout} horizontal dans lequel ajouter les images
+	 * @param urls      la liste d'URLs à charger ; si null ou vide, ne fait rien
+	 */
+	public static void loadUrlsIntoContainer(Activity activity, LinearLayout container, List<String> urls) {
+		if (null == urls || urls.isEmpty()) {
+			return;
+		}
+		for (String url : urls) {
+			addImageFromUrl(activity, container, url);
 		}
 	}
 

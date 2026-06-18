@@ -63,6 +63,13 @@
 	<string name="label_mobile_number">Téléphone mobile :</string>
 	<string name="label_address">Adresse :</string>
 
+	<!-- Password strength -->
+	<string name="passwordCondLength">Au moins 8 caractères</string>
+	<string name="passwordCondUppercase">Une majuscule</string>
+	<string name="passwordCondLowercase">Une minuscule</string>
+	<string name="passwordCondNumber">Un chiffre</string>
+	<string name="passwordCondSpecial">Un caractère spécial</string>
+
 	<!-- Label date -->
 	<string name="label_date">Date :</string>
 	<string name="label_time">Heure :</string>
