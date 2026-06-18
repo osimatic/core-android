@@ -206,7 +206,7 @@ public abstract class BaseFcmService extends FirebaseMessagingService {
 	protected final void showNotification(String title, String body, Intent intent) {
 		intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 		PendingIntent pendingIntent = PendingIntent.getActivity(
-				this, 0, intent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+				this, 0, intent, PendingIntent.FLAG_IMMUTABLE);
 
 		String channelId = getNotificationChannelId();
 		Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);

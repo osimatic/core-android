@@ -5,11 +5,13 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.os.Build;
+import android.util.Log;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /**
  * Utility class providing helper methods for postal address geocoding, validation, and formatting.
@@ -29,46 +31,52 @@ public class PostalAddress {
 	// =============================================================================================
 
 	/**
-	 * Returns the best-matching {@link Address} for the given {@link Location}, using the system geocoder.
+	 * Asynchronously returns the best-matching {@link Address} for the given {@link Location}.
 	 *
-	 * <p>On API 33+, the synchronous {@link Geocoder#getFromLocation(double, double, int)} is deprecated; this method still uses it for simplicity. For fully compliant API 33+ usage, prefer the asynchronous {@link Geocoder#getFromLocation(double, double, int, Geocoder.GeocodeListener)} overload.
+	 * <p>On API 33+, uses the asynchronous {@link Geocoder#getFromLocation(double, double, int, Geocoder.GeocodeListener)}.
+	 * On older APIs, runs the synchronous call on a background thread.
+	 * The callback is invoked with the result or {@code null} if none is found.
 	 *
 	 * @param context  the application context; must not be {@code null}
 	 * @param locale   the locale used to localize the returned address; must not be {@code null}
 	 * @param location the location to reverse-geocode; must not be {@code null}
-	 * @return the best-matching {@link Address}, or {@code null} if none is found or an error occurs
-	 * @see #getAddressFromCoordinates(Context, double, double, Locale)
-	 * @see <a href="https://developer.android.com/reference/android/location/Geocoder#getFromLocation(double,%20double,%20int)">Geocoder.getFromLocation — Android Developers</a>
+	 * @param callback called with the best-matching {@link Address}, or {@code null}
 	 */
-	public static Address getAddressFromLocation(Context context, Locale locale, Location location) {
-		return getAddressFromCoordinates(context, location.getLatitude(), location.getLongitude(), locale);
+	public static void getAddressFromLocation(Context context, Locale locale, Location location, Consumer<Address> callback) {
+		getAddressFromCoordinates(context, location.getLatitude(), location.getLongitude(), locale, callback);
 	}
 
 	/**
-	 * Returns the best-matching {@link Address} for the given coordinates, using the system geocoder.
+	 * Asynchronously returns the best-matching {@link Address} for the given coordinates.
 	 *
-	 * <p>On API 33+, the synchronous {@link Geocoder#getFromLocation(double, double, int)} is deprecated; this method still uses it for simplicity. For fully compliant API 33+ usage, prefer the asynchronous {@link Geocoder#getFromLocation(double, double, int, Geocoder.GeocodeListener)} overload.
+	 * <p>On API 33+, uses the asynchronous {@link Geocoder#getFromLocation(double, double, int, Geocoder.GeocodeListener)}.
+	 * On older APIs, runs the synchronous call on a background thread.
+	 * The callback is invoked with the result or {@code null} if none is found.
 	 *
 	 * @param context   the application context; must not be {@code null}
 	 * @param latitude  the latitude of the point to reverse-geocode
 	 * @param longitude the longitude of the point to reverse-geocode
 	 * @param locale    the locale used to localize the returned address; must not be {@code null}
-	 * @return the best-matching {@link Address}, or {@code null} if none is found or an error occurs
-	 * @see <a href="https://developer.android.com/reference/android/location/Geocoder">Geocoder — Android Developers</a>
+	 * @param callback  called with the best-matching {@link Address}, or {@code null}
 	 */
-	@SuppressWarnings("deprecation")
-	public static Address getAddressFromCoordinates(Context context, double latitude, double longitude, Locale locale) {
-		try {
-			Geocoder geocoder = new Geocoder(context, locale);
-			List<Address> results = geocoder.getFromLocation(latitude, longitude, 1);
-			if (results == null || results.isEmpty()) {
-				return null;
-			}
-			return results.get(0);
-		} catch (IOException e) {
-			e.printStackTrace();
+	public static void getAddressFromCoordinates(Context context, double latitude, double longitude, Locale locale, Consumer<Address> callback) {
+		Geocoder geocoder = new Geocoder(context, locale);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			geocoder.getFromLocation(latitude, longitude, 1, addresses ->
+				callback.accept(addresses != null && !addresses.isEmpty() ? addresses.get(0) : null)
+			);
+		} else {
+			new Thread(() -> {
+				try {
+					//noinspection deprecation
+					List<Address> results = geocoder.getFromLocation(latitude, longitude, 1);
+					callback.accept(results != null && !results.isEmpty() ? results.get(0) : null);
+				} catch (IOException e) {
+					Log.e("PostalAddress", "Geocoder failed", e);
+					callback.accept(null);
+				}
+			}).start();
 		}
-		return null;
 	}
 
 	// =============================================================================================

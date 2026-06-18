@@ -256,7 +256,13 @@ public class NFC {
 		String action = intent.getAction();
 		if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
 			Log.i(TAG, "Reading from NFC: " + action);
-			Parcelable[] rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+			Parcelable[] rawMsgs;
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+				rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage.class);
+			} else {
+				//noinspection deprecation
+				rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+			}
 			if (rawMsgs != null) {
 				for (Parcelable msg : rawMsgs) {
 					if (msg instanceof NdefMessage) {
