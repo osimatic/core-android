@@ -1,10 +1,12 @@
 package com.osimatic.core_android;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.Matrix;
 import android.net.Uri;
@@ -295,9 +297,30 @@ public class Image {
 		new Thread(() -> {
 			Bitmap bm = fetchBitmap(url);
 			if (null != bm) {
-				activity.runOnUiThread(() -> imageView.setImageBitmap(bm));
+				activity.runOnUiThread(() -> {
+					imageView.setImageBitmap(bm);
+					imageView.setOnClickListener(v -> showFullscreenImage(activity, bm));
+				});
 			}
 		}).start();
+	}
+
+	/**
+	 * Affiche {@code bitmap} en plein écran dans un Dialog noir. Tap n'importe où pour fermer.
+	 *
+	 * @param activity l'activity courante ; doit être non-null
+	 * @param bitmap   l'image à afficher
+	 */
+	@SuppressWarnings("deprecation")
+	public static void showFullscreenImage(Activity activity, Bitmap bitmap) {
+		Dialog dialog = new Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+		ImageView imageView = new ImageView(activity);
+		imageView.setImageBitmap(bitmap);
+		imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+		imageView.setBackgroundColor(Color.BLACK);
+		imageView.setOnClickListener(v -> dialog.dismiss());
+		dialog.setContentView(imageView);
+		dialog.show();
 	}
 
 	/**
