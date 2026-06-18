@@ -12,7 +12,11 @@ public class AlertDialog {
 	}
 
 	public static void showAlert(final Activity activity, final String message, DialogInterface.OnClickListener onClickListener) {
-		if (activity == null) {
+		showAlert(activity, message, onClickListener, null);
+	}
+
+	public static void showAlert(final Activity activity, final String message, DialogInterface.OnClickListener onClickListener, DialogInterface.OnClickListener onCancelListener) {
+		if (null == activity) {
 			Log.e(TAG, "activity null");
 			return;
 		}
@@ -20,15 +24,16 @@ public class AlertDialog {
 		activity.runOnUiThread(new Runnable() {
 			public void run() {
 				android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(activity);
-				//android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(activity.getApplicationContext());
 				builder.setTitle(activity.getResources().getString(R.string.error));
 				builder.setMessage(message);
-				builder.setCancelable(false);
+				builder.setCancelable(null != onCancelListener);
 				builder.setPositiveButton(activity.getResources().getString(R.string.ok), null != onClickListener ? onClickListener : new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int id) {
-
 					}
 				});
+				if (null != onCancelListener) {
+					builder.setNegativeButton(activity.getResources().getString(R.string.cancel), onCancelListener);
+				}
 
 				android.app.AlertDialog alert = builder.create();
 				try {
