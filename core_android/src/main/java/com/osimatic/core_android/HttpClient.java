@@ -110,14 +110,10 @@ public class HttpClient {
 	// En-têtes HTTP
 	// =============================================================================================
 
-	public static HashMap<String, String> getHttpHeaders(String httpMethod, @Nullable HashMap<String, String> additionalHeaders, @Nullable String accessToken, boolean asJson) {
+	// Surcharge sans Content-Type — pour les requêtes dont le Content-Type est géré ailleurs (ex: multipart)
+	public static HashMap<String, String> getHttpHeaders(@Nullable HashMap<String, String> additionalHeaders, @Nullable String accessToken) {
 		HashMap<String, String> headers = new HashMap<>();
 		headers.put("Accept-Language", Locale.getDefault().toLanguageTag());
-		if (asJson) {
-			headers.put("Content-Type", "application/json");
-		} else if (!HTTPMethod.GET.equals(httpMethod)) {
-			headers.put("Content-Type", "application/x-www-form-urlencoded");
-		}
 		if (null != accessToken) {
 			headers.put("Authorization", "Bearer " + accessToken);
 		}
@@ -126,6 +122,16 @@ public class HttpClient {
 				Log.d(TAG, "header " + entry.getKey() + " : " + entry.getValue());
 				headers.put(entry.getKey(), entry.getValue());
 			}
+		}
+		return headers;
+	}
+
+	public static HashMap<String, String> getHttpHeaders(String httpMethod, @Nullable HashMap<String, String> additionalHeaders, @Nullable String accessToken, boolean asJson) {
+		HashMap<String, String> headers = getHttpHeaders(additionalHeaders, accessToken);
+		if (asJson) {
+			headers.put("Content-Type", "application/json");
+		} else if (!HTTPMethod.GET.equals(httpMethod)) {
+			headers.put("Content-Type", "application/x-www-form-urlencoded");
 		}
 		return headers;
 	}
@@ -347,7 +353,7 @@ public class HttpClient {
 
 				@Override
 				public Map<String, String> getHeaders() {
-					return HttpClient.getHttpHeaders(HTTPMethod.POST, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
+					return HttpClient.getHttpHeaders(additionalHeaders, sendAuthorizationHeader ? authorizationToken : null);
 				}
 			}
 			.setTag(tag)
