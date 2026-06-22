@@ -224,7 +224,7 @@ public class HTTPRequest {
 		return new HTTPResponse(status, result.toString());
 	}
 
-	public static HTTPResponse postMultipart(String url, HashMap<String, String> data, HashMap<String, String> headers, String fileFieldName, List<byte[]> files) {
+	public static HTTPResponse postMultipart(String url, HashMap<String, String> data, HashMap<String, String> headers, Map<String, List<byte[]>> filesByFieldName) {
 		final String boundary = "osimatic_boundary_" + System.currentTimeMillis();
 		final String lineEnd = "\r\n";
 		final String twoHyphens = "--";
@@ -251,21 +251,28 @@ public class HTTPRequest {
 			}
 
 			// fichiers binaires
-			if (null != files) {
-				int index = 0;
-				for (byte[] fileBytes : files) {
-					if (null == fileBytes) {
+			if (null != filesByFieldName) {
+				for (Map.Entry<String, List<byte[]>> fieldEntry : filesByFieldName.entrySet()) {
+					String fileFieldName = fieldEntry.getKey();
+					List<byte[]> files = fieldEntry.getValue();
+					if (null == files) {
 						continue;
 					}
-					String filename = "photo_" + index + ".jpg";
-					bodyStream.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
-					bodyStream.write(("Content-Disposition: form-data; name=\"" + fileFieldName + "[]\"; filename=\"" + filename + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
-					bodyStream.write(("Content-Type: image/jpeg" + lineEnd).getBytes(StandardCharsets.UTF_8));
-					bodyStream.write(("Content-Transfer-Encoding: binary" + lineEnd).getBytes(StandardCharsets.UTF_8));
-					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-					bodyStream.write(fileBytes);
-					bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-					index++;
+					int index = 0;
+					for (byte[] fileBytes : files) {
+						if (null == fileBytes) {
+							continue;
+						}
+						String filename = "photo_" + index + ".jpg";
+						bodyStream.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
+						bodyStream.write(("Content-Disposition: form-data; name=\"" + fileFieldName + "[]\"; filename=\"" + filename + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
+						bodyStream.write(("Content-Type: image/jpeg" + lineEnd).getBytes(StandardCharsets.UTF_8));
+						bodyStream.write(("Content-Transfer-Encoding: binary" + lineEnd).getBytes(StandardCharsets.UTF_8));
+						bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+						bodyStream.write(fileBytes);
+						bodyStream.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+						index++;
+					}
 				}
 			}
 

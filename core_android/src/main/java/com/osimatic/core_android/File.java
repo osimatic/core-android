@@ -316,4 +316,70 @@ public class File {
 	public static boolean delete(String filePath) {
 		return new java.io.File(filePath).delete();
 	}
+
+	// =============================================================================================
+	// MIME type detection
+	// =============================================================================================
+
+	/**
+	 * Detects the MIME type of the given binary data by inspecting its magic bytes.
+	 *
+	 * @param data the binary content to inspect; may be {@code null}
+	 * @return the detected MIME type, or {@code "application/octet-stream"} if unknown
+	 */
+	public static String detectMimeType(byte[] data) {
+		if (null == data || data.length < 4) {
+			return "application/octet-stream";
+		}
+		int b0 = data[0] & 0xFF;
+		int b1 = data[1] & 0xFF;
+		int b2 = data[2] & 0xFF;
+		int b3 = data[3] & 0xFF;
+		if (b0 == 0xFF && b1 == 0xD8 && b2 == 0xFF) {
+			return "image/jpeg";
+		}
+		if (b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47) {
+			return "image/png";
+		}
+		if (b0 == 0x47 && b1 == 0x49 && b2 == 0x46) {
+			return "image/gif";
+		}
+		if (b0 == 0x42 && b1 == 0x4D) {
+			return "image/bmp";
+		}
+		if (b0 == 0x49 && b1 == 0x49 && b2 == 0x2A && b3 == 0x00) {
+			return "image/tiff";
+		}
+		if (b0 == 0x4D && b1 == 0x4D && b2 == 0x00 && b3 == 0x2A) {
+			return "image/tiff";
+		}
+		return "application/octet-stream";
+	}
+
+	/**
+	 * Returns the file extension for the given MIME type.
+	 *
+	 * @param mimeType the MIME type string; may be {@code null}
+	 * @return the file extension without a leading dot, or {@code "bin"} if unknown
+	 */
+	public static String getFileExtension(String mimeType) {
+		if (null == mimeType) {
+			return "bin";
+		}
+		switch (mimeType) {
+			case "image/jpeg": return "jpg";
+			case "image/png": return "png";
+			case "image/gif": return "gif";
+			case "image/bmp": return "bmp";
+			case "image/tiff": return "tiff";
+			case "image/webp": return "webp";
+			case "video/mp4": return "mp4";
+			case "video/quicktime": return "mov";
+			case "audio/mpeg": return "mp3";
+			case "audio/wav": return "wav";
+			case "application/pdf": return "pdf";
+			case "application/zip": return "zip";
+			default: return "bin";
+		}
+	}
 }
