@@ -27,6 +27,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 import com.osimatic.core_android.Audio;
+import com.osimatic.core_android.R;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -52,8 +53,9 @@ public class BarcodeScannerFragment extends Fragment {
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        previewView = new PreviewView(requireContext());
-        return previewView;
+        View root = inflater.inflate(R.layout.fragment_barcode_scanner, container, false);
+        previewView = root.findViewById(R.id.barcode_scanner_preview);
+        return root;
     }
 
     @Override
