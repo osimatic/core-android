@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.osimatic.core_android.PhotoGridPickerView
+<com.osimatic.core_android.photo.PhotoGridPickerView
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	android:id="@+id/photoGridPickerView"
 	android:layout_width="match_parent"
