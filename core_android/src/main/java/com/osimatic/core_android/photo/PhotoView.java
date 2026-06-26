@@ -33,8 +33,7 @@ public class PhotoView extends AppCompatImageView {
 		setAdjustViewBounds(true);
 		// annule le tint blanc appliqué globalement par le thème de l'app
 		setImageTintList(null);
-		int maxHeightPx = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 350, getResources().getDisplayMetrics());
-		setMaxHeight(maxHeightPx);
+		setMaxHeight(getResources().getDimensionPixelSize(R.dimen.photo_max_height));
 		setVisibility(View.GONE);
 		setOnClickListener(v -> {
 			if (null != bitmap) {
