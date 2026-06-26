@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+	<!-- photo plein format (portrait-friendly) -->
+	<style name="PhotoPreview">
+		<item name="android:layout_width">match_parent</item>
+		<item name="android:layout_height">wrap_content</item>
+		<item name="android:adjustViewBounds">true</item>
+		<item name="android:maxHeight">@dimen/photo_max_height</item>
+		<item name="android:scaleType">fitCenter</item>
+		<item name="android:tint">@null</item>
+	</style>
+
+	<!-- miniature carrée pour les grilles -->
+	<style name="PhotoThumbnail">
+		<item name="android:layout_width">match_parent</item>
+		<item name="android:layout_height">@dimen/photo_thumbnail_height</item>
+		<item name="android:scaleType">centerCrop</item>
+		<item name="android:tint">@null</item>
+	</style>
+
 	<style name="alert_info">
 		<item name="android:background">#d9edf7</item>
 		<item name="android:textColor">#31708f</item>

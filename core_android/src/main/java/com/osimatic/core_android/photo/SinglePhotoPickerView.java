@@ -20,11 +20,16 @@ public class SinglePhotoPickerView extends LinearLayout {
         void onTakePhoto();
     }
 
+    public interface OnPhotoClickListener {
+        void onPhotoClick();
+    }
+
     private Bitmap photo;
     private ImageView photoImageView;
     private TextView noPhotoLabel;
     private Button takePhotoButton;
     private OnTakePhotoListener onTakePhotoListener;
+    private OnPhotoClickListener onPhotoClickListener;
 
     public SinglePhotoPickerView(Context context) {
         super(context);
@@ -47,6 +52,11 @@ public class SinglePhotoPickerView extends LinearLayout {
         takePhotoButton.setOnClickListener(v -> {
             if (null != onTakePhotoListener) {
                 onTakePhotoListener.onTakePhoto();
+            }
+        });
+        photoImageView.setOnClickListener(v -> {
+            if (null != onPhotoClickListener && null != photo) {
+                onPhotoClickListener.onPhotoClick();
             }
         });
     }
@@ -73,5 +83,9 @@ public class SinglePhotoPickerView extends LinearLayout {
 
     public void setOnTakePhotoListener(OnTakePhotoListener listener) {
         this.onTakePhotoListener = listener;
+    }
+
+    public void setOnPhotoClickListener(OnPhotoClickListener listener) {
+        this.onPhotoClickListener = listener;
     }
 }

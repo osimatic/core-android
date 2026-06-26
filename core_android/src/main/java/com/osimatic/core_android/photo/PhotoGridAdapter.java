@@ -20,12 +20,21 @@ public class PhotoGridAdapter extends RecyclerView.Adapter<PhotoGridAdapter.Phot
 		void onDelete(int position);
 	}
 
+	public interface OnPhotoClickListener {
+		void onPhotoClick(int position);
+	}
+
 	private final List<Bitmap> photos;
 	private final OnPhotoDeleteListener deleteListener;
+	private OnPhotoClickListener clickListener;
 
 	public PhotoGridAdapter(List<Bitmap> photos, OnPhotoDeleteListener deleteListener) {
 		this.photos = photos;
 		this.deleteListener = deleteListener;
+	}
+
+	public void setOnPhotoClickListener(OnPhotoClickListener listener) {
+		this.clickListener = listener;
 	}
 
 	@NonNull
@@ -42,6 +51,12 @@ public class PhotoGridAdapter extends RecyclerView.Adapter<PhotoGridAdapter.Phot
 			int pos = holder.getAdapterPosition();
 			if (pos != RecyclerView.NO_ID) {
 				deleteListener.onDelete(pos);
+			}
+		});
+		holder.imageView.setOnClickListener(v -> {
+			int pos = holder.getAdapterPosition();
+			if (pos != RecyclerView.NO_ID && null != clickListener) {
+				clickListener.onPhotoClick(pos);
 			}
 		});
 	}

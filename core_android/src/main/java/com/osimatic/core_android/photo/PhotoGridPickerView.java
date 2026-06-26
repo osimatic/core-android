@@ -110,6 +110,10 @@ public class PhotoGridPickerView extends LinearLayout {
 		this.onRemoveListener = listener;
 	}
 
+	public void setOnPhotoClickListener(PhotoGridAdapter.OnPhotoClickListener listener) {
+		adapter.setOnPhotoClickListener(listener);
+	}
+
 	private void updateUI() {
 		if (null != counterFormat) {
 			counterText.setText(String.format(counterFormat, photos.size(), maxPhotos));

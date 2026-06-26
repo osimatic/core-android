@@ -91,6 +91,19 @@ public class PhotoGridPickerFragment extends Fragment {
 		}
 		photoGridPickerView.setOnAddClickListener(this::takePhoto);
 		photoGridPickerView.setOnRemoveListener(position -> notifyPhotosChanged());
+		photoGridPickerView.setOnPhotoClickListener(position -> {
+			List<Bitmap> photos = photoGridPickerView.getPhotos();
+			if (position < photos.size()) {
+				showFullscreen(photos.get(position));
+			}
+		});
+	}
+
+	private void showFullscreen(Bitmap bitmap) {
+		if (null == bitmap) {
+			return;
+		}
+		FullscreenPhotoFragment.newInstance(bitmap).show(getChildFragmentManager(), "fullscreen");
 	}
 
 	public void setOnPhotosChangedListener(OnPhotosChangedListener listener) {

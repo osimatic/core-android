@@ -85,6 +85,14 @@ public class SinglePhotoPickerFragment extends Fragment {
             singlePhotoPickerView.setNoPhotoText(noPhotoText);
         }
         singlePhotoPickerView.setOnTakePhotoListener(this::takePhoto);
+        singlePhotoPickerView.setOnPhotoClickListener(() -> showFullscreen(singlePhotoPickerView.getPhoto()));
+    }
+
+    private void showFullscreen(Bitmap bitmap) {
+        if (null == bitmap) {
+            return;
+        }
+        FullscreenPhotoFragment.newInstance(bitmap).show(getChildFragmentManager(), "fullscreen");
     }
 
     public void setOnPhotoChangedListener(OnPhotoChangedListener listener) {

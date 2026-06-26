@@ -1,4 +1,9 @@
 <resources>
+	<!-- ========== PHOTO ========== -->
+
+	<dimen name="photo_max_height">350dp</dimen>
+	<dimen name="photo_thumbnail_height">110dp</dimen>
+
 	<!-- ========== DURATION PICKER ========== -->
 
 	<dimen name="touchable">40dp</dimen>
