@@ -1,4 +1,4 @@
-package com.osimatic.core_android.adapter;
+package com.osimatic.core_android.photo;
 
 import android.graphics.Bitmap;
 import android.view.LayoutInflater;
