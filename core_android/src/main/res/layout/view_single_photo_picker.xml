@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+	android:layout_width="match_parent"
+	android:layout_height="wrap_content"
+	android:orientation="vertical">
+
+	<TextView
+		android:id="@+id/singlePhotoPickerNoPhotoLabel"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="5dp"
+		android:gravity="center"
+		android:visibility="visible" />
+
+	<ImageView
+		android:id="@+id/singlePhotoPickerImageView"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginBottom="5dp"
+		android:adjustViewBounds="true"
+		android:maxHeight="200dp"
+		android:scaleType="centerCrop"
+		android:visibility="gone" />
+
+	<Button
+		android:id="@+id/singlePhotoPickerButton"
+		style="@style/Widget.MaterialComponents.Button.TextButton"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="center_horizontal"
+		android:layout_marginBottom="5dp" />
+
+</merge>
