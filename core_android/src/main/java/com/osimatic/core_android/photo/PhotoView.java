@@ -9,6 +9,8 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.fragment.app.FragmentActivity;
 
+import com.osimatic.core_android.R;
+
 public class PhotoView extends AppCompatImageView {
 
 	private Bitmap bitmap;
