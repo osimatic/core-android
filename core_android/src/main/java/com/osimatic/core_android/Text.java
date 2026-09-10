@@ -4,7 +4,12 @@ import android.text.Html;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.URLSpan;
+import android.view.View;
 import android.widget.TextView;
+
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.text.Normalizer;
 
@@ -38,6 +43,31 @@ public class Text {
 		final SpannableString spannableString = new SpannableString(text);
 		spannableString.setSpan(new URLSpan(""), 0, spannableString.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 		tv.setText(spannableString, TextView.BufferType.SPANNABLE);
+	}
+
+	// =============================================================================================
+	// Keyboard utilities
+	// =============================================================================================
+
+	/**
+	 * Hides the on-screen keyboard (IME) currently associated with the given view, if any.
+	 *
+	 * <pre>
+	 * Text.hideKeyboard(activity.getCurrentFocus());
+	 * </pre>
+	 *
+	 * @param view the currently focused view (e.g. from {@code Activity.getCurrentFocus()}); may be {@code null}
+	 * @see WindowInsetsControllerCompat#hide(int)
+	 * @see WindowInsetsCompat.Type#ime()
+	 */
+	public static void hideKeyboard(View view) {
+		if (view == null) {
+			return;
+		}
+		WindowInsetsControllerCompat controller = ViewCompat.getWindowInsetsController(view);
+		if (controller != null) {
+			controller.hide(WindowInsetsCompat.Type.ime());
+		}
 	}
 
 	// =============================================================================================
