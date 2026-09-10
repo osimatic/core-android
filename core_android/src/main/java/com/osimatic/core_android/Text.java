@@ -1,5 +1,6 @@
 package com.osimatic.core_android;
 
+import android.text.Html;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.URLSpan;
@@ -187,6 +188,10 @@ public class Text {
 		return sb.toString();
 	}
 
+	// =============================================================================================
+	// HTML utilities
+	// =============================================================================================
+
 	/**
 	 * Removes all HTML tags from the given string.
 	 *
@@ -202,6 +207,21 @@ public class Text {
 	public static String stripHtml(String html) {
 		if (html == null) return null;
 		return html.replaceAll("<[^>]+>", "");
+	}
+
+	/**
+	 * Converts an HTML string to a {@link Spanned}, using the legacy HTML parser
+	 * (same rendering behavior as the deprecated single-argument {@code Html.fromHtml(String)}).
+	 *
+	 * @param html the HTML string to convert; may be {@code null}
+	 * @return the parsed {@link Spanned}, or {@code null} if {@code html} is {@code null}
+	 * @see Html#fromHtml(String, int)
+	 */
+	public static Spanned fromHtml(String html) {
+		if (html == null) {
+			return null;
+		}
+		return Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY);
 	}
 
 	/**
