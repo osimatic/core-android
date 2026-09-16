@@ -14,6 +14,7 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
+import com.google.firebase.installations.FirebaseInstallations;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
@@ -24,7 +25,7 @@ import java.util.function.Consumer;
 
 /**
  * Generic base class for Firebase Cloud Messaging.
- * Handles token lifecycle, topic subscriptions and notification display.
+ * Handles installation id lifecycle, topic subscriptions and notification display.
  * Subclasses provide app-specific behavior via abstract methods.
  *
  * <p>Supported data payload keys:
@@ -39,7 +40,7 @@ import java.util.function.Consumer;
  *   <li>Extend this class in your app.</li>
  *   <li>Implement the abstract methods.</li>
  *   <li>Call {@link #subscribeToTopic} / {@link #unsubscribeFromTopic} where needed (e.g. after login/logout).</li>
- *   <li>Call {@link #deleteToken(Consumer)} on logout.</li>
+ *   <li>Call {@link #unregister(Consumer)} on logout.</li>
  * </ol>
  *
  * @see <a href="https://firebase.google.com/docs/cloud-messaging/android/receive">FCM — Receive messages on Android</a>
@@ -56,12 +57,12 @@ public abstract class BaseFcmService extends FirebaseMessagingService {
 	protected abstract boolean isUserLoggedIn();
 
 	/**
-	 * Sends the FCM token to the backend server.
-	 * Called automatically on token refresh when a session is active.
+	 * Sends the Firebase Installations ID (FID) to the backend server.
+	 * Called automatically on registration when a session is active.
 	 *
-	 * @param token the new FCM registration token
+	 * @param installationId the Firebase Installations ID
 	 */
-	protected abstract void registerTokenOnServer(String token);
+	protected abstract void registerInstallationIdOnServer(String installationId);
 
 	/**
 	 * Builds the {@link Intent} to open when the user taps the notification.
@@ -128,38 +129,53 @@ public abstract class BaseFcmService extends FirebaseMessagingService {
 	}
 
 	@Override
-	public final void onNewToken(@NonNull String token) {
-		Log.d(TAG, "Token refreshed: " + token);
+	public final void onRegistered(@NonNull String installationId) {
+		Log.d(TAG, "Registered, installation id: " + installationId);
 		if (!isUserLoggedIn()) {
 			return;
 		}
-		new Thread(() -> registerTokenOnServer(token)).start();
+		new Thread(() -> registerInstallationIdOnServer(installationId)).start();
 	}
 
 	// -------------------------------------------------------------------------
-	// Token management
+	// Installation id management
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Deletes the FCM token. The device will no longer receive FCM messages
-	 * until a new token is generated and registered.
-	 * On success, {@code onTokenDeleted} is called on a background thread with the deleted token.
+	 * Retrieves the current Firebase Installations ID (FID).
+	 *
+	 * @param onIdRetrieved callback invoked (on a background thread) with the id; may be null
+	 * @see <a href="https://firebase.google.com/docs/reference/android/com/google/firebase/installations/FirebaseInstallations#getId()">FirebaseInstallations.getId()</a>
+	 */
+	public static void getInstallationId(Consumer<String> onIdRetrieved) {
+		FirebaseInstallations.getInstance().getId()
+				.addOnSuccessListener(id -> {
+					if (onIdRetrieved != null) {
+						new Thread(() -> onIdRetrieved.accept(id)).start();
+					}
+				})
+				.addOnFailureListener(e -> Log.e(TAG, "Failed to retrieve installation id: " + e.getMessage()));
+	}
+
+	/**
+	 * Unregisters from FCM. The device will no longer receive FCM messages until registered again.
+	 * On success, {@code onUnregistered} is called on a background thread with the installation id.
 	 * Call this on logout.
 	 *
-	 * @param onTokenDeleted callback invoked (on a background thread) with the deleted token; may be null
-	 * @see <a href="https://firebase.google.com/docs/reference/android/com/google/firebase/messaging/FirebaseMessaging#deleteToken()">FirebaseMessaging.deleteToken()</a>
+	 * @param onUnregistered callback invoked (on a background thread) with the installation id; may be null
+	 * @see <a href="https://firebase.google.com/docs/reference/android/com/google/firebase/messaging/FirebaseMessaging#unregister()">FirebaseMessaging.unregister()</a>
 	 */
-	public static void deleteToken(Consumer<String> onTokenDeleted) {
-		FirebaseMessaging.getInstance().getToken()
-				.addOnSuccessListener(token -> FirebaseMessaging.getInstance().deleteToken()
+	public static void unregister(Consumer<String> onUnregistered) {
+		FirebaseInstallations.getInstance().getId()
+				.addOnSuccessListener(id -> FirebaseMessaging.getInstance().unregister()
 						.addOnSuccessListener(unused -> {
-							Log.d(TAG, "FCM token deleted");
-							if (onTokenDeleted != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-								new Thread(() -> onTokenDeleted.accept(token)).start();
+							Log.d(TAG, "FCM unregistered");
+							if (onUnregistered != null) {
+								new Thread(() -> onUnregistered.accept(id)).start();
 							}
 						})
-						.addOnFailureListener(e -> Log.e(TAG, "Failed to delete FCM token: " + e.getMessage())))
-				.addOnFailureListener(e -> Log.e(TAG, "Failed to retrieve FCM token: " + e.getMessage()));
+						.addOnFailureListener(e -> Log.e(TAG, "Failed to unregister: " + e.getMessage())))
+				.addOnFailureListener(e -> Log.e(TAG, "Failed to retrieve installation id: " + e.getMessage()));
 	}
 
 	// -------------------------------------------------------------------------

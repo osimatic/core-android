@@ -5,7 +5,6 @@ import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.NetworkInfo;
 import android.net.NetworkRequest;
 import android.os.Build;
 import android.provider.Settings;
@@ -213,7 +212,7 @@ public class Device {
 	/**
 	 * Returns {@code true} if the device currently has an active network connection.
 	 *
-	 * <p>On API 23+, uses {@link NetworkCapabilities} to check for Wi-Fi, cellular, or Ethernet transport. On API 21–22, falls back to the deprecated {@link NetworkInfo#isConnected()}.
+	 * <p>Uses {@link NetworkCapabilities} to check for Wi-Fi, cellular, or Ethernet transport.
 	 *
 	 * <p><b>Note:</b> this method checks transport availability, not actual internet reachability.
 	 *
@@ -225,20 +224,13 @@ public class Device {
 	public static boolean isOnline(Context context) {
 		ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
 		if (cm == null) return false;
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			Network network = cm.getActiveNetwork();
-			if (network == null) return false;
-			NetworkCapabilities capabilities = cm.getNetworkCapabilities(network);
-			return capabilities != null
-					&& (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-					|| capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-					|| capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
-		} else {
-			//noinspection deprecation
-			NetworkInfo networkInfo = cm.getActiveNetworkInfo();
-			//noinspection deprecation
-			return networkInfo != null && networkInfo.isConnected();
-		}
+		Network network = cm.getActiveNetwork();
+		if (network == null) return false;
+		NetworkCapabilities capabilities = cm.getNetworkCapabilities(network);
+		return capabilities != null
+				&& (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+				|| capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+				|| capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET));
 	}
 
 	/** @deprecated Use {@link #isOnline(Context)} instead. */
@@ -320,26 +312,6 @@ public class Device {
 	@ChecksSdkIntAtLeast(parameter = 0)
 	public static boolean isAtLeast(int apiLevel) {
 		return Build.VERSION.SDK_INT >= apiLevel;
-	}
-
-	/**
-	 * Returns {@code true} if the device runs Android Marshmallow (API 23) or later.
-	 *
-	 * @return {@code true} if {@link Build.VERSION#SDK_INT} ≥ {@link Build.VERSION_CODES#M}
-	 */
-	@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.M)
-	public static boolean isMarshmallowOrLater() {
-		return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
-	}
-
-	/**
-	 * Returns {@code true} if the device runs Android Nougat (API 24) or later.
-	 *
-	 * @return {@code true} if {@link Build.VERSION#SDK_INT} ≥ {@link Build.VERSION_CODES#N}
-	 */
-	@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.N)
-	public static boolean isNougatOrLater() {
-		return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N;
 	}
 
 	/**
