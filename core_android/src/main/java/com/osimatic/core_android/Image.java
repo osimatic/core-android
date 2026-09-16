@@ -209,7 +209,7 @@ public class Image {
 	 *
 	 * <p>If the intent contains a URI (full-size image from gallery), the bitmap is loaded via the content resolver. If the intent contains an extras bundle with a {@code "data"} key (thumbnail from camera), that bitmap is returned directly.
 	 *
-	 * <p>On API 28+, uses {@link ImageDecoder} instead of the deprecated {@link MediaStore.Images.Media#getBitmap}.
+	 * <p>On API 28+, uses {@link ImageDecoder}; on earlier versions, decodes the stream directly with {@link BitmapFactory}.
 	 *
 	 * @param intent  the result intent from {@code onActivityResult}; may be {@code null}
 	 * @param context the application context; must not be {@code null}
@@ -225,9 +225,9 @@ public class Image {
 				Uri uri = intent.getData();
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 					return ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.getContentResolver(), uri));
-				} else {
-					//noinspection deprecation
-					return MediaStore.Images.Media.getBitmap(context.getContentResolver(), uri);
+				}
+				try (InputStream input = context.getContentResolver().openInputStream(uri)) {
+					return BitmapFactory.decodeStream(input);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -236,7 +236,12 @@ public class Image {
 		}
 		if (intent.getExtras() != null) {
 			try {
-				return (Bitmap) intent.getExtras().get("data");
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+					return intent.getExtras().getParcelable("data", Bitmap.class);
+				}
+				@SuppressWarnings("deprecation")
+				Bitmap legacyBitmap = intent.getExtras().getParcelable("data");
+				return legacyBitmap;
 			} catch (Exception e) {
 				e.printStackTrace();
 				return null;

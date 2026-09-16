@@ -44,7 +44,7 @@ public class Country {
 	 * @see <a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2">ISO 3166-1 alpha-2 — Wikipedia</a>
 	 */
 	public static String getDisplayName(String countryCode, Locale displayLocale) {
-		return new Locale("", countryCode).getDisplayCountry(displayLocale);
+		return toLocale(countryCode).getDisplayCountry(displayLocale);
 	}
 
 	/** @deprecated Use {@link #getDisplayName(String)} instead. */
@@ -121,6 +121,6 @@ public class Country {
 	 * @see Locale
 	 */
 	public static Locale toLocale(String countryCode) {
-		return new Locale("", countryCode);
+		return new Locale.Builder().setRegion(countryCode).build();
 	}
 }

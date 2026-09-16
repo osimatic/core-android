@@ -1,5 +1,6 @@
 package com.osimatic.core_android;
 
+import android.app.Activity;
 import android.text.Html;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -7,7 +8,7 @@ import android.text.style.URLSpan;
 import android.view.View;
 import android.widget.TextView;
 
-import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
@@ -64,10 +65,12 @@ public class Text {
 		if (view == null) {
 			return;
 		}
-		WindowInsetsControllerCompat controller = ViewCompat.getWindowInsetsController(view);
-		if (controller != null) {
-			controller.hide(WindowInsetsCompat.Type.ime());
+		Activity activity = Device.findActivity(view.getContext());
+		if (activity == null) {
+			return;
 		}
+		WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(activity.getWindow(), view);
+		controller.hide(WindowInsetsCompat.Type.ime());
 	}
 
 	// =============================================================================================

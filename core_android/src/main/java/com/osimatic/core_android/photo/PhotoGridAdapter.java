@@ -48,13 +48,13 @@ public class PhotoGridAdapter extends RecyclerView.Adapter<PhotoGridAdapter.Phot
 	public void onBindViewHolder(@NonNull PhotoViewHolder holder, int position) {
 		holder.imageView.setImageBitmap(photos.get(position));
 		holder.deleteButton.setOnClickListener(v -> {
-			int pos = holder.getAdapterPosition();
+			int pos = holder.getBindingAdapterPosition();
 			if (pos != RecyclerView.NO_ID) {
 				deleteListener.onDelete(pos);
 			}
 		});
 		holder.imageView.setOnClickListener(v -> {
-			int pos = holder.getAdapterPosition();
+			int pos = holder.getBindingAdapterPosition();
 			if (pos != RecyclerView.NO_ID && null != clickListener) {
 				clickListener.onPhotoClick(pos);
 			}

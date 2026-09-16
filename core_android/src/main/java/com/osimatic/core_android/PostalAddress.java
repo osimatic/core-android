@@ -65,18 +65,19 @@ public class PostalAddress {
 			geocoder.getFromLocation(latitude, longitude, 1, addresses ->
 				callback.accept(addresses != null && !addresses.isEmpty() ? addresses.get(0) : null)
 			);
-		} else {
-			new Thread(() -> {
-				try {
-					//noinspection deprecation
-					List<Address> results = geocoder.getFromLocation(latitude, longitude, 1);
-					callback.accept(results != null && !results.isEmpty() ? results.get(0) : null);
-				} catch (IOException e) {
-					Log.e("PostalAddress", "Geocoder failed", e);
-					callback.accept(null);
-				}
-			}).start();
+			return;
 		}
+
+		new Thread(() -> {
+			try {
+				@SuppressWarnings("deprecation")
+				List<Address> results = geocoder.getFromLocation(latitude, longitude, 1);
+				callback.accept(results != null && !results.isEmpty() ? results.get(0) : null);
+			} catch (IOException e) {
+				Log.e("PostalAddress", "Geocoder failed", e);
+				callback.accept(null);
+			}
+		}).start();
 	}
 
 	// =============================================================================================

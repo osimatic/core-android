@@ -245,7 +245,7 @@ public class NFC {
 	/**
 	 * Extracts all {@link NdefMessage} objects from the given NFC {@link Intent}.
 	 *
-	 * <p>Handles both {@link NfcAdapter#ACTION_TAG_DISCOVERED} and {@link NfcAdapter#ACTION_NDEF_DISCOVERED} actions. If no NDEF messages are found in the extras, a single message containing an unknown-type record is returned.
+	 * <p>Handles the {@link NfcAdapter#ACTION_NDEF_DISCOVERED} action. Tags that don't carry NDEF data are not handled by this method; use {@link NfcAdapter#enableReaderMode} for those. If no NDEF messages are found in the extras, a single message containing an unknown-type record is returned.
 	 *
 	 * @param intent the NFC intent received in {@code onNewIntent}; must not be {@code null}
 	 * @return a list of {@link NdefMessage} objects; never {@code null}, may be empty
@@ -254,14 +254,15 @@ public class NFC {
 	public static List<NdefMessage> getMessagesFromIntent(Intent intent) {
 		List<NdefMessage> intentMessages = new ArrayList<>();
 		String action = intent.getAction();
-		if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action) || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
+		if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
 			Log.i(TAG, "Reading from NFC: " + action);
 			Parcelable[] rawMsgs;
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 				rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage.class);
 			} else {
-				//noinspection deprecation
-				rawMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+				@SuppressWarnings("deprecation")
+				Parcelable[] legacyMsgs = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+				rawMsgs = legacyMsgs;
 			}
 			if (rawMsgs != null) {
 				for (Parcelable msg : rawMsgs) {

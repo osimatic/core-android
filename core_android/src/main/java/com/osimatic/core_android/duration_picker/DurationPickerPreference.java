@@ -1,13 +1,11 @@
 package com.osimatic.core_android.duration_picker;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.preference.DialogPreference;
 import android.util.AttributeSet;
-import android.view.LayoutInflater;
-import android.view.View;
-import com.osimatic.core_android.R;
+
+import androidx.preference.DialogPreference;
+import androidx.preference.PreferenceFragmentCompat;
 
 /**
  * A preference that allows the user to pick a time duration using a {@link DurationPicker}.
@@ -19,9 +17,24 @@ import com.osimatic.core_android.R;
  * <li>You can use one of the {@code PLACEHOLDER_*} strings in your summary which will be replaced by the duration.
  * For example a summary could look like {@code "Remind me in ${m:ss} minute(s)."}
  * </ol>
+ * <p>
+ * As with any other {@link DialogPreference} subclass in AndroidX, the hosting {@link PreferenceFragmentCompat} must
+ * override {@code onDisplayPreferenceDialog} to show the associated {@link DurationPickerPreferenceDialogFragment}:
+ * <pre>{@code
+ * @Override
+ * public void onDisplayPreferenceDialog(Preference preference) {
+ *     if (preference instanceof DurationPickerPreference) {
+ *         DurationPickerPreferenceDialogFragment fragment = DurationPickerPreferenceDialogFragment.newInstance(preference.getKey());
+ *         fragment.setTargetFragment(this, 0);
+ *         fragment.show(getParentFragmentManager(), "androidx.preference.PreferenceFragment.DIALOG");
+ *     } else {
+ *         super.onDisplayPreferenceDialog(preference);
+ *     }
+ * }
+ * }</pre>
  *
  * @see DurationPicker
- * @see DurationPickerDialog
+ * @see DurationPickerPreferenceDialogFragment
  */
 public class DurationPickerPreference extends DialogPreference {
 	/**
@@ -38,7 +51,6 @@ public class DurationPickerPreference extends DialogPreference {
 	public static final String PLACEHOLDER_SECONDS = "${s}";
 
 	private long duration = 0;
-	private DurationPicker picker = null;
 	private String summaryTemplate;
 
 	public DurationPickerPreference(Context context) {
@@ -61,6 +73,7 @@ public class DurationPickerPreference extends DialogPreference {
 		persistLong(duration);
 		notifyDependencyChange(shouldDisableDependents());
 		notifyChanged();
+		updateSummary();
 	}
 
 	/**
@@ -72,22 +85,17 @@ public class DurationPickerPreference extends DialogPreference {
 		return duration;
 	}
 
-	/**
-	 * Gets the {@link DurationPicker} used by this dialog.
-	 *
-	 * @return the picker used by this dialog.
-	 */
-	public DurationPicker getDurationPicker() {
-		return picker;
-	}
-
 	//
 	// internal stuff
 	//
 
-	private void updateDescription() {
+	/**
+	 * Updates the displayed summary by substituting the {@code PLACEHOLDER_*} tokens in the summary template with the current duration.
+	 */
+	private void updateSummary() {
 		if (summaryTemplate == null) {
-			summaryTemplate = getSummary().toString();
+			CharSequence summary = getSummary();
+			summaryTemplate = summary == null ? "" : summary.toString();
 		}
 		final String summary = summaryTemplate
 				.replace(PLACEHOLDER_HOURS_MINUTES_SECONDS, DurationUtils.formatHoursMinutesSeconds(duration))
@@ -97,59 +105,13 @@ public class DurationPickerPreference extends DialogPreference {
 	}
 
 	@Override
-	protected void onPrepareDialogBuilder(AlertDialog.Builder builder) {
-		super.onPrepareDialogBuilder(builder.setTitle(null).setIcon(null));
-	}
-
-	@Override
-	protected View onCreateDialogView() {
-		final LayoutInflater inflater = LayoutInflater.from(getContext());
-		picker = initPicker((DurationPicker) inflater.inflate(R.layout.duration_picker_dialog, null));
-		return picker;
-	}
-
-	protected DurationPicker initPicker(DurationPicker timePicker) {
-		return timePicker;
-	}
-
-	@Override
-	protected void onBindDialogView(View v) {
-		super.onBindDialogView(v);
-		picker.setDuration(duration);
-	}
-
-	@Override
-	protected void onDialogClosed(boolean positiveResult) {
-		super.onDialogClosed(positiveResult);
-
-		if (positiveResult) {
-			final long newDuration = picker.getDuration();
-
-			if (!callChangeListener(newDuration)) {
-				return;
-			}
-
-			// persist
-			setDuration(newDuration);
-			updateDescription();
-		}
-	}
-
-	@Override
 	protected Object onGetDefaultValue(TypedArray a, int index) {
 		return (long) a.getInt(index, 0);
 	}
 
 	@Override
-	protected void onSetInitialValue(boolean restorePersistedValue, Object defaultValue) {
-		final long duration;
-		if (restorePersistedValue)
-			duration = getPersistedLong(0);
-		else
-			duration = Long.parseLong(defaultValue.toString());
-
-		// need to persist here for default value to work
-		setDuration(duration);
-		updateDescription();
+	protected void onSetInitialValue(Object defaultValue) {
+		long defaultDuration = defaultValue != null ? Long.parseLong(defaultValue.toString()) : 0L;
+		setDuration(getPersistedLong(defaultDuration));
 	}
 }

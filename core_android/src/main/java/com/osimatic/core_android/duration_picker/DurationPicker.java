@@ -110,9 +110,9 @@ public class DurationPicker extends FrameLayout {
 		try {
 			applyPadding(attributes, R.styleable.DurationPicker_numPadButtonPadding, numPadButtons);
 
-			applyTextAppearance(context, attributes, R.styleable.DurationPicker_textAppearanceDisplay, displayViews);
-			applyTextAppearance(context, attributes, R.styleable.DurationPicker_textAppearanceButton, numPadButtons);
-			applyTextAppearance(context, attributes, R.styleable.DurationPicker_textAppearanceUnit, unitLabelViews);
+			applyTextAppearance(attributes, R.styleable.DurationPicker_textAppearanceDisplay, displayViews);
+			applyTextAppearance(attributes, R.styleable.DurationPicker_textAppearanceButton, numPadButtons);
+			applyTextAppearance(attributes, R.styleable.DurationPicker_textAppearanceUnit, unitLabelViews);
 
 			applyIcon(attributes, R.styleable.DurationPicker_backspaceIcon, backspaceButton);
 			applyIcon(attributes, R.styleable.DurationPicker_clearIcon, clearButton);
@@ -219,7 +219,7 @@ public class DurationPicker extends FrameLayout {
 	 * @param resId resource id of the style describing the text appearance.
 	 */
 	public void setDisplayTextAppearance(int resId) {
-		applyTextAppearance(getContext(), resId, displayViews);
+		applyTextAppearance(resId, displayViews);
 	}
 
 	/**
@@ -227,7 +227,7 @@ public class DurationPicker extends FrameLayout {
 	 * @param resId resource id of the style describing the text appearance.
 	 */
 	public void setUnitTextAppearance(int resId) {
-		applyTextAppearance(getContext(), resId, unitLabelViews);
+		applyTextAppearance(resId, unitLabelViews);
 	}
 
 	/**
@@ -235,7 +235,7 @@ public class DurationPicker extends FrameLayout {
 	 * @param resId resource id of the style describing the text appearance.
 	 */
 	public void setButtonTextAppearance(int resId) {
-		applyTextAppearance(getContext(), resId, numPadButtons);
+		applyTextAppearance(resId, numPadButtons);
 	}
 
 	/**
@@ -293,15 +293,15 @@ public class DurationPicker extends FrameLayout {
 		for (View view : targetViews) view.setPadding(padding, padding, padding, padding);
 	}
 
-	private void applyTextAppearance(Context context, TypedArray attrs, int attributeIndex, final TextView[] targetViews) {
+	private void applyTextAppearance(TypedArray attrs, int attributeIndex, final TextView[] targetViews) {
 		final int id = attrs.getResourceId(attributeIndex, 0);
 		if (id != 0) {
-			applyTextAppearance(context, id, targetViews);
+			applyTextAppearance(id, targetViews);
 		}
 	}
 
-	private void applyTextAppearance(Context context, int resId, final TextView[] targetViews) {
-		for (TextView view : targetViews) view.setTextAppearance(context, resId);
+	private void applyTextAppearance(int resId, final TextView[] targetViews) {
+		for (TextView view : targetViews) view.setTextAppearance(resId);
 	}
 
 	private void applyIcon(TypedArray attrs, int attributeIndex, ImageView targetView) {

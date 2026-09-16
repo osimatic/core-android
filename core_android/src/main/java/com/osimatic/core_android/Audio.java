@@ -323,24 +323,32 @@ public class Audio {
 	 * @see VibrationEffect#createOneShot(long, int)
 	 * @see <a href="https://developer.android.com/reference/android/os/VibrationEffect">VibrationEffect — Android Docs</a>
 	 */
-	@SuppressWarnings("deprecation")
 	public static void vibrate(Context context, long durationMs) {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-			Vibrator v;
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-				VibratorManager vm = (VibratorManager) context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
-				v = vm != null ? vm.getDefaultVibrator() : null;
-			} else {
-				v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-			}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+			VibratorManager vm = (VibratorManager) context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+			Vibrator v = vm != null ? vm.getDefaultVibrator() : null;
 			if (v != null) {
 				v.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE));
 			}
-		} else {
+			return;
+		}
+
+		vibrateLegacy(context, durationMs);
+	}
+
+	@SuppressWarnings("deprecation")
+	private static void vibrateLegacy(Context context, long durationMs) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 			Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
 			if (v != null) {
-				v.vibrate(durationMs);
+				v.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE));
 			}
+			return;
+		}
+
+		Vibrator v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+		if (v != null) {
+			v.vibrate(durationMs);
 		}
 	}
 }

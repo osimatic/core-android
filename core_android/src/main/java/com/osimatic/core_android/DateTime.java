@@ -1,9 +1,6 @@
 package com.osimatic.core_android;
 
-import static android.text.format.Time.MONDAY_BEFORE_JULIAN_EPOCH;
-
 import android.content.res.Resources;
-import android.text.format.Time;
 
 import java.text.DateFormatSymbols;
 import java.text.ParseException;
@@ -392,29 +389,57 @@ public class DateTime {
 	// =============================================================================================
 
 	/**
-	 * Returns the number of weeks since {@link Time#EPOCH_JULIAN_DAY} (Jan 1, 1970) adjusted for the first day of week.
+	 * The Julian day number of the Unix epoch (1970-01-01), a Thursday.
 	 *
-	 * <p>This takes a Julian day and the week start day and calculates which week since {@link Time#EPOCH_JULIAN_DAY} that day occurs in, starting at 0. Do <b>not</b> use this to compute the ISO week number for the year.
+	 * @see #toJulianDayNumber(int, int, int)
+	 */
+	private static final int EPOCH_JULIAN_DAY = toJulianDayNumber(1970, 1, 1);
+
+	/**
+	 * The Julian day number of the Monday of the week containing {@link #EPOCH_JULIAN_DAY} (1969-12-29).
+	 */
+	private static final int MONDAY_BEFORE_JULIAN_EPOCH = EPOCH_JULIAN_DAY - 3;
+
+	/**
+	 * Converts a proleptic Gregorian calendar date to its Julian day number.
+	 *
+	 * @param year  the year
+	 * @param month the month, 1-based (1–12)
+	 * @param day   the day of month (1–31)
+	 * @return the Julian day number of the given date
+	 * @see <a href="https://en.wikipedia.org/wiki/Julian_day#Julian_day_number_calculation">Julian day number calculation — Wikipedia</a>
+	 */
+	private static int toJulianDayNumber(int year, int month, int day) {
+		int a = (14 - month) / 12;
+		int y = year + 4800 - a;
+		int m = month + 12 * a - 3;
+		return day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
+	}
+
+	/**
+	 * Returns the number of weeks since {@link #EPOCH_JULIAN_DAY} (Jan 1, 1970) adjusted for the first day of week.
+	 *
+	 * <p>This takes a Julian day and the week start day and calculates which week since {@link #EPOCH_JULIAN_DAY} that day occurs in, starting at 0. Do <b>not</b> use this to compute the ISO week number for the year.
 	 *
 	 * @param julianDay      the Julian day to calculate the week number for
-	 * @param firstDayOfWeek which weekday is the first day of the week; see {@link Time#SUNDAY}
+	 * @param firstDayOfWeek which weekday is the first day of the week, using the {@link Calendar} convention (e.g. {@link Calendar#SUNDAY})
 	 * @return the number of weeks since the epoch
 	 * @see #getJulianMondayFromWeeksSinceEpoch(int)
 	 * @see <a href="https://en.wikipedia.org/wiki/Julian_day">Julian day — Wikipedia</a>
 	 */
 	public static int getWeeksSinceEpochFromJulianDay(int julianDay, int firstDayOfWeek) {
-		int diff = Time.THURSDAY - firstDayOfWeek;
+		int diff = Calendar.THURSDAY - firstDayOfWeek;
 		if (diff < 0) {
 			diff += 7;
 		}
-		int refDay = Time.EPOCH_JULIAN_DAY - diff;
+		int refDay = EPOCH_JULIAN_DAY - diff;
 		return (julianDay - refDay) / 7;
 	}
 
 	/**
 	 * Returns the Julian day of the Monday for the given number of weeks since the epoch.
 	 *
-	 * <p>This assumes that the week containing {@link Time#EPOCH_JULIAN_DAY} is week 0. It returns the Julian day for the Monday {@code week} weeks after the Monday of the week containing the epoch.
+	 * <p>This assumes that the week containing {@link #EPOCH_JULIAN_DAY} is week 0. It returns the Julian day for the Monday {@code week} weeks after the Monday of the week containing the epoch.
 	 *
 	 * @param week the number of weeks since the epoch
 	 * @return the Julian day for the Monday of the given week since the epoch
@@ -426,49 +451,12 @@ public class DateTime {
 	}
 
 	/**
-	 * Returns the first day of the week as an {@link android.text.format.Time} constant, based on the device's default locale.
-	 *
-	 * @return {@link Time#MONDAY}, {@link Time#SATURDAY}, or {@link Time#SUNDAY}
-	 * @see #getFirstDayOfWeekAsCalendar()
-	 */
-	public static int getFirstDayOfWeek() {
-		int startDay = Calendar.getInstance().getFirstDayOfWeek();
-		if (startDay == Calendar.SATURDAY) {
-			return Time.SATURDAY;
-		} else if (startDay == Calendar.MONDAY) {
-			return Time.MONDAY;
-		} else {
-			return Time.SUNDAY;
-		}
-	}
-
-	/**
 	 * Returns the first day of the week as a {@link Calendar} constant, based on the device's default locale.
 	 *
-	 * @return {@link Calendar#MONDAY}, {@link Calendar#SATURDAY}, or {@link Calendar#SUNDAY}
-	 * @see #getFirstDayOfWeek()
+	 * @return a {@link Calendar} day-of-week constant (e.g. {@link Calendar#MONDAY}, {@link Calendar#SUNDAY})
+	 * @see Calendar#getFirstDayOfWeek()
 	 */
-	public static int getFirstDayOfWeekAsCalendar() {
-		return convertDayOfWeekFromTimeToCalendar(getFirstDayOfWeek());
-	}
-
-	/**
-	 * Converts a day-of-week constant from {@link android.text.format.Time} to the equivalent {@link Calendar} constant.
-	 *
-	 * @param timeDayOfWeek a day-of-week constant from {@link android.text.format.Time} ({@link Time#SUNDAY} to {@link Time#SATURDAY})
-	 * @return the equivalent {@link Calendar} day-of-week constant
-	 * @throws IllegalArgumentException if {@code timeDayOfWeek} is not a valid {@link Time} day constant
-	 */
-	public static int convertDayOfWeekFromTimeToCalendar(int timeDayOfWeek) {
-		return switch (timeDayOfWeek) {
-			case Time.MONDAY    -> Calendar.MONDAY;
-			case Time.TUESDAY   -> Calendar.TUESDAY;
-			case Time.WEDNESDAY -> Calendar.WEDNESDAY;
-			case Time.THURSDAY  -> Calendar.THURSDAY;
-			case Time.FRIDAY    -> Calendar.FRIDAY;
-			case Time.SATURDAY  -> Calendar.SATURDAY;
-			case Time.SUNDAY    -> Calendar.SUNDAY;
-			default -> throw new IllegalArgumentException("Argument must be between Time.SUNDAY and Time.SATURDAY");
-		};
+	public static int getFirstDayOfWeek() {
+		return Calendar.getInstance().getFirstDayOfWeek();
 	}
 }

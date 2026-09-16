@@ -195,14 +195,34 @@ public class Device {
 			android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
 				return info.getLongVersionCode();
-			} else {
-				//noinspection deprecation
-				return info.versionCode;
 			}
+			@SuppressWarnings("deprecation")
+			int versionCode = info.versionCode;
+			return versionCode;
 		} catch (PackageManager.NameNotFoundException e) {
 			e.printStackTrace();
 		}
 		return -1;
+	}
+
+	// =============================================================================================
+	// Context
+	// =============================================================================================
+
+	/**
+	 * Unwraps the given {@link Context} to find the enclosing {@link android.app.Activity}, if any.
+	 *
+	 * @param context the context to unwrap; may be {@code null}
+	 * @return the enclosing {@link android.app.Activity}, or {@code null} if none is found (e.g. an application context)
+	 */
+	public static android.app.Activity findActivity(Context context) {
+		while (context instanceof android.content.ContextWrapper) {
+			if (context instanceof android.app.Activity) {
+				return (android.app.Activity) context;
+			}
+			context = ((android.content.ContextWrapper) context).getBaseContext();
+		}
+		return null;
 	}
 
 	// =============================================================================================

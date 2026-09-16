@@ -85,7 +85,6 @@ public class File {
 			request.setDescription(description);
 		}
 		request.setTitle(fileName);
-		request.setVisibleInDownloadsUi(false);
 		if (mimeType != null) {
 			request.setMimeType(mimeType);
 		}
