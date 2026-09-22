@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.ImageDecoder;
 import android.graphics.Matrix;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.MediaStore;
@@ -18,6 +19,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import androidx.core.content.FileProvider;
+
+import com.osimatic.core_android.photo.PhotoView;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
@@ -282,13 +285,44 @@ public class Image {
 	// =============================================================================================
 
 	/**
-	 * Crée un {@link ImageView} stylisé, l'ajoute dans le {@code container} et charge l'image depuis {@code url} en thread de fond.
+	 * Télécharge l'image depuis {@code url} en thread de fond et l'affiche dans {@code imageView}.
+	 *
+	 * <p>Si {@code imageView} est un {@link PhotoView}, passe par {@link PhotoView#setPhoto} (gestion de la visibilité et du plein écran incluse) ; sinon, appelle simplement {@link ImageView#setImageBitmap}.
+	 *
+	 * @param activity  l'activity courante (pour {@code runOnUiThread}) ; doit être non-null
+	 * @param imageView la vue dans laquelle afficher l'image ; peut être un {@link PhotoView}
+	 * @param url       l'URL de l'image à télécharger
+	 */
+	public static void loadUrlIntoView(Activity activity, ImageView imageView, String url) {
+		if (null == activity || null == imageView) {
+			return;
+		}
+		new Thread(() -> {
+			Bitmap bm = fetchBitmap(url);
+			if (null != bm) {
+				activity.runOnUiThread(() -> {
+					if (imageView instanceof PhotoView) {
+						((PhotoView) imageView).setPhoto(bm);
+					}
+					else {
+						imageView.setImageBitmap(bm);
+					}
+				});
+			}
+		}).start();
+	}
+
+	/**
+	 * Crée un {@link ImageView} stylisé, l'ajoute dans le {@code container} et charge l'image depuis {@code url} via {@link #loadUrlIntoView}. Un tap sur l'image l'affiche en plein écran.
 	 *
 	 * @param activity  l'activity courante (pour {@code runOnUiThread}) ; doit être non-null
 	 * @param container le {@link LinearLayout} horizontal dans lequel ajouter l'image
 	 * @param url       l'URL de l'image à télécharger
 	 */
 	public static void addImageFromUrl(Activity activity, LinearLayout container, String url) {
+		if (null == activity || null == container) {
+			return;
+		}
 		ImageView imageView = new ImageView(activity);
 		LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
 			LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -298,16 +332,13 @@ public class Image {
 		imageView.setLayoutParams(params);
 		imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
 		imageView.setAdjustViewBounds(true);
-		container.addView(imageView);
-		new Thread(() -> {
-			Bitmap bm = fetchBitmap(url);
-			if (null != bm) {
-				activity.runOnUiThread(() -> {
-					imageView.setImageBitmap(bm);
-					imageView.setOnClickListener(v -> showFullscreenImage(activity, bm));
-				});
+		imageView.setOnClickListener(v -> {
+			if (imageView.getDrawable() instanceof BitmapDrawable) {
+				showFullscreenImage(activity, ((BitmapDrawable) imageView.getDrawable()).getBitmap());
 			}
-		}).start();
+		});
+		container.addView(imageView);
+		loadUrlIntoView(activity, imageView, url);
 	}
 
 	/**
@@ -318,6 +349,9 @@ public class Image {
 	 */
 	@SuppressWarnings("deprecation")
 	public static void showFullscreenImage(Activity activity, Bitmap bitmap) {
+		if (null == activity || null == bitmap) {
+			return;
+		}
 		Dialog dialog = new Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
 		ImageView imageView = new ImageView(activity);
 		imageView.setImageBitmap(bitmap);
@@ -336,7 +370,7 @@ public class Image {
 	 * @param urls      la liste d'URLs à charger ; si null ou vide, ne fait rien
 	 */
 	public static void loadUrlsIntoContainer(Activity activity, LinearLayout container, List<String> urls) {
-		if (null == urls || urls.isEmpty()) {
+		if (null == activity || null == container || null == urls || urls.isEmpty()) {
 			return;
 		}
 		for (String url : urls) {
