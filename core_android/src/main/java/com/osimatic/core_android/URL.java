@@ -130,6 +130,23 @@ public class URL {
 		return Uri.parse(url).buildUpon().clearQuery().fragment(null).build().toString();
 	}
 
+	/**
+	 * Returns the file extension (without leading dot) of the last path segment of the given URL, ignoring any query string or fragment.
+	 *
+	 * <pre>
+	 * getExtension("https://example.com/dir/file.pdf?X-Amz-Signature=abc")  = "pdf"
+	 * getExtension("https://example.com/dir/file.pdf#section")              = "pdf"
+	 * getExtension("https://example.com/dir/file")                          = ""
+	 * </pre>
+	 *
+	 * @param url the URL to inspect; must not be {@code null}
+	 * @return the file extension without leading dot, an empty string if none, or {@code null} if the path cannot be determined
+	 * @see File#getExtension(String)
+	 */
+	public static String getExtension(String url) {
+		return File.getExtension(Uri.parse(url).getPath());
+	}
+
 	// =============================================================================================
 	// Encoding / decoding
 	// =============================================================================================
