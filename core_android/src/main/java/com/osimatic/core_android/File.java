@@ -3,14 +3,18 @@ package com.osimatic.core_android;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Environment;
+import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStream;
 import java.text.DecimalFormat;
 import java.util.Locale;
 import java.util.Map;
@@ -160,6 +164,34 @@ public class File {
 		return null;
 	}
 
+	/**
+	 * Reads the entire content of a file identified by a {@link Uri} (e.g. returned by a document/content picker) and returns it as a byte array.
+	 *
+	 * <p>Returns {@code null} if the file cannot be read.
+	 *
+	 * @param context the application context; must not be {@code null}
+	 * @param uri     the content {@link Uri} to read; must not be {@code null}
+	 * @return the file content as a byte array, or {@code null} if an error occurs
+	 * @see #readBinaryFile(String)
+	 */
+	public static byte[] readBinaryFile(Context context, Uri uri) {
+		try (InputStream input = context.getContentResolver().openInputStream(uri)) {
+			if (null == input) {
+				return null;
+			}
+			ByteArrayOutputStream output = new ByteArrayOutputStream();
+			byte[] buffer = new byte[8192];
+			int nbBytesRead;
+			while ((nbBytesRead = input.read(buffer)) != -1) {
+				output.write(buffer, 0, nbBytesRead);
+			}
+			return output.toByteArray();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
 	// =============================================================================================
 	// Write
 	// =============================================================================================
@@ -292,6 +324,28 @@ public class File {
 	 */
 	public static String getMimeType(Context context, Uri uri) {
 		return context.getContentResolver().getType(uri);
+	}
+
+	/**
+	 * Returns the display name (file name) of the content identified by the given {@link Uri}, as reported by its {@link OpenableColumns#DISPLAY_NAME} column.
+	 *
+	 * @param context the application context; must not be {@code null}
+	 * @param uri     the content {@link Uri} to query; must not be {@code null}
+	 * @return the display name, or {@code null} if it cannot be determined
+	 * @see OpenableColumns#DISPLAY_NAME
+	 */
+	public static String getDisplayName(Context context, Uri uri) {
+		try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
+			if (null != cursor && cursor.moveToFirst()) {
+				int nameColumnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+				if (nameColumnIndex >= 0) {
+					return cursor.getString(nameColumnIndex);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	/**
