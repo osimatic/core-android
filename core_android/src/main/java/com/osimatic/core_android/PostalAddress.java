@@ -1,9 +1,12 @@
 package com.osimatic.core_android;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Build;
 import android.util.Log;
 
@@ -253,6 +256,60 @@ public class PostalAddress {
 		if (!zipCity.isEmpty())          parts.add(zipCity);
 		if (!isBlank(countryIsoCode))    parts.add(countryIsoCode);
 		return String.join(", ", parts);
+	}
+
+	// =============================================================================================
+	// Google Maps
+	// =============================================================================================
+
+	/**
+	 * Opens the given coordinates in the Google Maps app via a {@code geo:} intent.
+	 *
+	 * <p>Does nothing and returns {@code false} if {@code activity} is {@code null} or the Google Maps app ({@code com.google.android.apps.maps}) is not installed, avoiding an {@link android.content.ActivityNotFoundException}.
+	 *
+	 * @param activity    the activity used to resolve and start the intent; may be {@code null}
+	 * @param coordinates the coordinates to open, in {@code "latitude,longitude"} format; must not be {@code null}
+	 * @return {@code true} if the Google Maps app was found and the intent was started, {@code false} otherwise
+	 * @see #openAddressInGoogleMaps(Activity, String)
+	 * @see <a href="https://developer.android.com/guide/components/intents-common#Maps">Common Intents — Maps</a>
+	 */
+	public static boolean openCoordinatesInGoogleMaps(Activity activity, String coordinates) {
+		if (null == activity) {
+			return false;
+		}
+
+		Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:" + coordinates));
+		intent.setPackage("com.google.android.apps.maps");
+		if (null == intent.resolveActivity(activity.getPackageManager())) {
+			return false;
+		}
+		activity.startActivity(intent);
+		return true;
+	}
+
+	/**
+	 * Opens the given free-text address in the Google Maps app via a {@code geo:0,0?q=} intent.
+	 *
+	 * <p>Does nothing and returns {@code false} if {@code activity} is {@code null} or the Google Maps app ({@code com.google.android.apps.maps}) is not installed, avoiding an {@link android.content.ActivityNotFoundException}.
+	 *
+	 * @param activity the activity used to resolve and start the intent; may be {@code null}
+	 * @param address  the free-text address to search for; must not be {@code null}
+	 * @return {@code true} if the Google Maps app was found and the intent was started, {@code false} otherwise
+	 * @see #openCoordinatesInGoogleMaps(Activity, String)
+	 * @see <a href="https://developer.android.com/guide/components/intents-common#Maps">Common Intents — Maps</a>
+	 */
+	public static boolean openAddressInGoogleMaps(Activity activity, String address) {
+		if (null == activity) {
+			return false;
+		}
+
+		Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + URL.encode(address)));
+		intent.setPackage("com.google.android.apps.maps");
+		if (null == intent.resolveActivity(activity.getPackageManager())) {
+			return false;
+		}
+		activity.startActivity(intent);
+		return true;
 	}
 
 	// =============================================================================================

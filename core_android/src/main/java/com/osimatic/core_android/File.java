@@ -119,14 +119,18 @@ public class File {
 	/**
 	 * Opens the given URL in an external application (e.g. a browser or a document viewer) via an {@link Intent#ACTION_VIEW} intent.
 	 *
-	 * <p>Does nothing and returns {@code false} if no application can handle the intent, avoiding an {@link android.content.ActivityNotFoundException}.
+	 * <p>Does nothing and returns {@code false} if {@code activity} is {@code null} or no application can handle the intent, avoiding an {@link android.content.ActivityNotFoundException}.
 	 *
-	 * @param activity the activity used to resolve and start the intent; must not be {@code null}
+	 * @param activity the activity used to resolve and start the intent; may be {@code null}
 	 * @param url      the URL to open; must not be {@code null}
 	 * @return {@code true} if an application was found and the intent was started, {@code false} otherwise
 	 * @see Intent#ACTION_VIEW
 	 */
 	public static boolean openUrl(Activity activity, String url) {
+		if (null == activity) {
+			return false;
+		}
+
 		Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 		if (null == intent.resolveActivity(activity.getPackageManager())) {
 			return false;
