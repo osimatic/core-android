@@ -73,8 +73,27 @@ public class SinglePhotoPickerView extends LinearLayout {
         return photo;
     }
 
+    /**
+     * Clears the currently displayed photo and shows the "no photo" state again.
+     */
+    public void reset() {
+        photo = null;
+        photoImageView.setImageBitmap(null);
+        photoImageView.setVisibility(View.GONE);
+        noPhotoLabel.setVisibility(View.VISIBLE);
+    }
+
     public void setButtonText(String text) {
         takePhotoButton.setText(text);
+    }
+
+    /**
+     * Shows or hides the built-in "take photo" button, for callers that trigger {@link SinglePhotoPickerFragment#takePhoto()} themselves from an external button/dialog.
+     *
+     * @param visible {@code false} to hide the built-in button
+     */
+    public void setButtonVisible(boolean visible) {
+        takePhotoButton.setVisibility(visible ? View.VISIBLE : View.GONE);
     }
 
     public void setNoPhotoText(String text) {

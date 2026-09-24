@@ -28,19 +28,75 @@ public class SinglePhotoPickerFragment extends Fragment {
 
     private static final String TAG = "SinglePhotoPickerFragment";
 
+    private static final String ARG_FILEPROVIDER_AUTHORITY = "fileproviderAuthority";
+    private static final String ARG_ADD_BUTTON_TEXT = "addButtonText";
+    private static final String ARG_NO_PHOTO_TEXT = "noPhotoText";
+    private static final String ARG_CAMERA_PERMISSION_DENIED_MESSAGE = "cameraPermissionDeniedMessage";
+    private static final String ARG_BUTTON_VISIBLE = "buttonVisible";
+
     public interface OnPhotoChangedListener {
         void onPhotoChanged(@Nullable Bitmap photo);
     }
 
-    // Config statique — à initialiser avant l'ajout du fragment
-    public static String fileproviderAuthority;
-    public static String addButtonText;
-    public static String noPhotoText;
-    public static String cameraPermissionDeniedMessage;
+    /**
+     * Creates a new instance configured with the given texts, with its built-in "take photo" button visible.
+     *
+     * @param fileproviderAuthority        the {@link androidx.core.content.FileProvider} authority declared in the host app's manifest, used to obtain a full-resolution photo capture {@link Uri}; must not be {@code null}
+     * @param addButtonText                the text of the "take photo" button; may be {@code null} to keep the layout's default text
+     * @param noPhotoText                  the text shown when no photo has been taken yet; may be {@code null} to keep the layout's default text
+     * @param cameraPermissionDeniedMessage the message displayed when the camera permission is denied; may be {@code null}
+     * @return a new, configured {@link SinglePhotoPickerFragment}
+     */
+    public static SinglePhotoPickerFragment newInstance(String fileproviderAuthority, @Nullable String addButtonText, @Nullable String noPhotoText, @Nullable String cameraPermissionDeniedMessage) {
+        return newInstance(fileproviderAuthority, addButtonText, noPhotoText, cameraPermissionDeniedMessage, true);
+    }
+
+    /**
+     * Creates a new instance configured with the given texts.
+     *
+     * @param fileproviderAuthority        the {@link androidx.core.content.FileProvider} authority declared in the host app's manifest, used to obtain a full-resolution photo capture {@link Uri}; must not be {@code null}
+     * @param addButtonText                the text of the "take photo" button; may be {@code null} to keep the layout's default text
+     * @param noPhotoText                  the text shown when no photo has been taken yet; may be {@code null} to keep the layout's default text
+     * @param cameraPermissionDeniedMessage the message displayed when the camera permission is denied; may be {@code null}
+     * @param buttonVisible                {@code false} to hide the built-in "take photo" button, for callers that trigger {@link #takePhoto()} themselves from an external button/dialog
+     * @return a new, configured {@link SinglePhotoPickerFragment}
+     */
+    public static SinglePhotoPickerFragment newInstance(String fileproviderAuthority, @Nullable String addButtonText, @Nullable String noPhotoText, @Nullable String cameraPermissionDeniedMessage, boolean buttonVisible) {
+        SinglePhotoPickerFragment fragment = new SinglePhotoPickerFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_FILEPROVIDER_AUTHORITY, fileproviderAuthority);
+        args.putString(ARG_ADD_BUTTON_TEXT, addButtonText);
+        args.putString(ARG_NO_PHOTO_TEXT, noPhotoText);
+        args.putString(ARG_CAMERA_PERMISSION_DENIED_MESSAGE, cameraPermissionDeniedMessage);
+        args.putBoolean(ARG_BUTTON_VISIBLE, buttonVisible);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    private String fileproviderAuthority;
+    private String addButtonText;
+    private String noPhotoText;
+    private String cameraPermissionDeniedMessage;
+    private boolean buttonVisible = true;
 
     private SinglePhotoPickerView singlePhotoPickerView;
     private Uri currentPhotoUri;
     private OnPhotoChangedListener onPhotoChangedListener;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        Bundle args = getArguments();
+        if (null == args) {
+            return;
+        }
+        fileproviderAuthority = args.getString(ARG_FILEPROVIDER_AUTHORITY);
+        addButtonText = args.getString(ARG_ADD_BUTTON_TEXT);
+        noPhotoText = args.getString(ARG_NO_PHOTO_TEXT);
+        cameraPermissionDeniedMessage = args.getString(ARG_CAMERA_PERMISSION_DENIED_MESSAGE);
+        buttonVisible = args.getBoolean(ARG_BUTTON_VISIBLE, true);
+    }
 
     private final ActivityResultLauncher<Intent> photoLauncher =
         registerForActivityResult(new ActivityResultContracts.StartActivityForResult(),
@@ -86,6 +142,7 @@ public class SinglePhotoPickerFragment extends Fragment {
         }
         singlePhotoPickerView.setOnTakePhotoListener(this::takePhoto);
         singlePhotoPickerView.setOnPhotoClickListener(() -> showFullscreen(singlePhotoPickerView.getPhoto()));
+        singlePhotoPickerView.setButtonVisible(buttonVisible);
     }
 
     private void showFullscreen(Bitmap bitmap) {
@@ -113,7 +170,23 @@ public class SinglePhotoPickerFragment extends Fragment {
         }
     }
 
-    private void takePhoto() {
+    /**
+     * Clears the currently selected photo, for callers that offer another attachment option alongside this fragment (e.g. a document picker) and need to reset the photo state when the other option is chosen.
+     */
+    public void reset() {
+        if (null == singlePhotoPickerView) {
+            return;
+        }
+        singlePhotoPickerView.reset();
+        notifyPhotoChanged(null);
+    }
+
+    /**
+     * Launches the camera to take a photo, requesting the camera permission first if needed.
+     *
+     * <p>Exposed publicly so callers with {@code buttonVisible=false} can trigger the capture from their own external button/dialog.
+     */
+    public void takePhoto() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissionLauncher.launch(Manifest.permission.CAMERA);
             return;
