@@ -22,6 +22,7 @@ import androidx.fragment.app.Fragment;
 
 import com.osimatic.core_android.FlashMessage;
 import com.osimatic.core_android.Image;
+import com.osimatic.core_android.Permission;
 import com.osimatic.core_android.R;
 
 public class SinglePhotoPickerFragment extends Fragment {
@@ -32,6 +33,7 @@ public class SinglePhotoPickerFragment extends Fragment {
     private static final String ARG_ADD_BUTTON_TEXT = "addButtonText";
     private static final String ARG_NO_PHOTO_TEXT = "noPhotoText";
     private static final String ARG_CAMERA_PERMISSION_DENIED_MESSAGE = "cameraPermissionDeniedMessage";
+    private static final String ARG_OPEN_SETTINGS_BUTTON_TEXT = "openSettingsButtonText";
     private static final String ARG_BUTTON_VISIBLE = "buttonVisible";
 
     public interface OnPhotoChangedListener {
@@ -41,6 +43,8 @@ public class SinglePhotoPickerFragment extends Fragment {
     /**
      * Creates a new instance configured with the given texts, with its built-in "take photo" button visible.
      *
+     * <p>On permission denial, only {@code cameraPermissionDeniedMessage} is shown as a plain message (no "open Settings" action). Use {@link #newInstance(String, String, String, String, String, boolean)} to also offer that action.
+     *
      * @param fileproviderAuthority        the {@link androidx.core.content.FileProvider} authority declared in the host app's manifest, used to obtain a full-resolution photo capture {@link Uri}; must not be {@code null}
      * @param addButtonText                the text of the "take photo" button; may be {@code null} to keep the layout's default text
      * @param noPhotoText                  the text shown when no photo has been taken yet; may be {@code null} to keep the layout's default text
@@ -48,7 +52,7 @@ public class SinglePhotoPickerFragment extends Fragment {
      * @return a new, configured {@link SinglePhotoPickerFragment}
      */
     public static SinglePhotoPickerFragment newInstance(String fileproviderAuthority, @Nullable String addButtonText, @Nullable String noPhotoText, @Nullable String cameraPermissionDeniedMessage) {
-        return newInstance(fileproviderAuthority, addButtonText, noPhotoText, cameraPermissionDeniedMessage, true);
+        return newInstance(fileproviderAuthority, addButtonText, noPhotoText, cameraPermissionDeniedMessage, null, true);
     }
 
     /**
@@ -58,16 +62,18 @@ public class SinglePhotoPickerFragment extends Fragment {
      * @param addButtonText                the text of the "take photo" button; may be {@code null} to keep the layout's default text
      * @param noPhotoText                  the text shown when no photo has been taken yet; may be {@code null} to keep the layout's default text
      * @param cameraPermissionDeniedMessage the message displayed when the camera permission is denied; may be {@code null}
+     * @param openSettingsButtonText       if non-{@code null}, shown as a {@link com.osimatic.core_android.Permission#showSettingsSnackbar(View, String, String) settings Snackbar} action on permission denial, instead of a plain message
      * @param buttonVisible                {@code false} to hide the built-in "take photo" button, for callers that trigger {@link #takePhoto()} themselves from an external button/dialog
      * @return a new, configured {@link SinglePhotoPickerFragment}
      */
-    public static SinglePhotoPickerFragment newInstance(String fileproviderAuthority, @Nullable String addButtonText, @Nullable String noPhotoText, @Nullable String cameraPermissionDeniedMessage, boolean buttonVisible) {
+    public static SinglePhotoPickerFragment newInstance(String fileproviderAuthority, @Nullable String addButtonText, @Nullable String noPhotoText, @Nullable String cameraPermissionDeniedMessage, @Nullable String openSettingsButtonText, boolean buttonVisible) {
         SinglePhotoPickerFragment fragment = new SinglePhotoPickerFragment();
         Bundle args = new Bundle();
         args.putString(ARG_FILEPROVIDER_AUTHORITY, fileproviderAuthority);
         args.putString(ARG_ADD_BUTTON_TEXT, addButtonText);
         args.putString(ARG_NO_PHOTO_TEXT, noPhotoText);
         args.putString(ARG_CAMERA_PERMISSION_DENIED_MESSAGE, cameraPermissionDeniedMessage);
+        args.putString(ARG_OPEN_SETTINGS_BUTTON_TEXT, openSettingsButtonText);
         args.putBoolean(ARG_BUTTON_VISIBLE, buttonVisible);
         fragment.setArguments(args);
         return fragment;
@@ -77,6 +83,7 @@ public class SinglePhotoPickerFragment extends Fragment {
     private String addButtonText;
     private String noPhotoText;
     private String cameraPermissionDeniedMessage;
+    private String openSettingsButtonText;
     private boolean buttonVisible = true;
 
     private SinglePhotoPickerView singlePhotoPickerView;
@@ -95,6 +102,7 @@ public class SinglePhotoPickerFragment extends Fragment {
         addButtonText = args.getString(ARG_ADD_BUTTON_TEXT);
         noPhotoText = args.getString(ARG_NO_PHOTO_TEXT);
         cameraPermissionDeniedMessage = args.getString(ARG_CAMERA_PERMISSION_DENIED_MESSAGE);
+        openSettingsButtonText = args.getString(ARG_OPEN_SETTINGS_BUTTON_TEXT);
         buttonVisible = args.getBoolean(ARG_BUTTON_VISIBLE, true);
     }
 
@@ -117,8 +125,10 @@ public class SinglePhotoPickerFragment extends Fragment {
         registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
             if (isGranted) {
                 takePhoto();
-            } else {
-                if (null != cameraPermissionDeniedMessage) {
+            } else if (null != cameraPermissionDeniedMessage) {
+                if (null != openSettingsButtonText) {
+                    Permission.showSettingsSnackbar(requireView(), cameraPermissionDeniedMessage, openSettingsButtonText);
+                } else {
                     FlashMessage.display(requireActivity(), cameraPermissionDeniedMessage);
                 }
             }
