@@ -19,7 +19,7 @@ import java.util.List;
  * de gérer plusieurs queues indépendantes dans la même application.</p>
  *
  * <pre>
- *   PendingJsonQueue queue = new PendingJsonQueue(context, "pending_clockings");
+ *   PendingJsonQueue queue = new PendingJsonQueue(context, "pending_items");
  *   queue.enqueue(item);
  *   List&lt;JSONObject&gt; items = queue.getAll();
  *   queue.removeFirst();
@@ -29,6 +29,24 @@ public class PendingJsonQueue {
 
 	private static final String TAG = Config.START_TAG + "PendingJsonQueue";
 	private static final String KEY_QUEUE = "queue";
+
+	/** Clé JSON marquant un élément refusé par le serveur : il reste dans la queue sans être renvoyé. */
+	public static final String KEY_REJECTED = "rejected";
+
+	/** Résultat de l'envoi d'un élément par {@link ItemSender}. */
+	public enum SendOutcome {
+		/** Envoi réussi : l'élément est retiré de la queue. */
+		SENT,
+		/** Refus définitif : l'élément est marqué {@link #KEY_REJECTED} et conservé dans la queue. */
+		REJECTED,
+		/** Échec temporaire : la synchronisation s'arrête, l'élément et les suivants sont conservés. */
+		RETRY
+	}
+
+	/** Envoie un élément de la queue et retourne son résultat. */
+	public interface ItemSender {
+		SendOutcome send(JSONObject item);
+	}
 
 	private final Context context;
 	private final String name;
@@ -94,7 +112,66 @@ public class PendingJsonQueue {
 		save(new JSONArray());
 	}
 
+	/**
+	 * Envoie les éléments dans l'ordre, de manière synchrone.
+	 *
+	 * <p>Les éléments déjà marqués {@link #KEY_REJECTED} sont conservés sans être envoyés.
+	 * Après un {@link SendOutcome#RETRY}, les éléments suivants sont conservés sans être envoyés.
+	 * Les éléments ajoutés pendant la synchronisation sont conservés à la fin de la queue.</p>
+	 *
+	 * @param sender envoie chaque élément et retourne son résultat
+	 * @return true si toute la queue a été traitée, false si une nouvelle tentative est nécessaire
+	 */
+	public boolean drain(ItemSender sender) {
+		List<JSONObject> snapshot = getAll();
+		List<JSONObject> updated = new ArrayList<>();
+		boolean retry = false;
+
+		for (JSONObject item : snapshot) {
+			if (retry || item.optBoolean(KEY_REJECTED, false)) {
+				updated.add(item);
+				continue;
+			}
+
+			SendOutcome outcome = sender.send(item);
+			if (SendOutcome.RETRY == outcome) {
+				retry = true;
+				updated.add(item);
+			} else if (SendOutcome.REJECTED == outcome) {
+				markAsRejected(item);
+				updated.add(item);
+			}
+			// SENT : l'élément n'est pas reconservé
+		}
+
+		replaceHead(snapshot.size(), updated);
+		return !retry;
+	}
+
 	// --- Helpers ---
+
+	private static void markAsRejected(JSONObject item) {
+		try {
+			item.put(KEY_REJECTED, true);
+		} catch (JSONException e) {
+			Log.e(TAG, "impossible de marquer l'élément refusé : " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Remplace les {@code processedCount} premiers éléments par {@code updated}, en conservant les éléments ajoutés depuis.
+	 */
+	private void replaceHead(int processedCount, List<JSONObject> updated) {
+		JSONArray current = load();
+		JSONArray rebuilt = new JSONArray();
+		for (JSONObject item : updated) {
+			rebuilt.put(item);
+		}
+		for (int i = Math.min(processedCount, current.length()); i < current.length(); i++) {
+			rebuilt.put(current.opt(i));
+		}
+		save(rebuilt);
+	}
 
 	private JSONArray load() {
 		SharedPreferences prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE);

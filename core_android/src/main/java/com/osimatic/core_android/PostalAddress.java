@@ -65,9 +65,19 @@ public class PostalAddress {
 	public static void getAddressFromCoordinates(Context context, double latitude, double longitude, Locale locale, Consumer<Address> callback) {
 		Geocoder geocoder = new Geocoder(context, locale);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-			geocoder.getFromLocation(latitude, longitude, 1, addresses ->
-				callback.accept(addresses != null && !addresses.isEmpty() ? addresses.get(0) : null)
-			);
+			geocoder.getFromLocation(latitude, longitude, 1, new Geocoder.GeocodeListener() {
+				@Override
+				public void onGeocode(List<Address> addresses) {
+					callback.accept(addresses != null && !addresses.isEmpty() ? addresses.get(0) : null);
+				}
+
+				@Override
+				public void onError(String errorMessage) {
+					// Without this, the callback is never invoked when geocoding fails (e.g. offline)
+					Log.e("PostalAddress", "Geocoder failed: " + errorMessage);
+					callback.accept(null);
+				}
+			});
 			return;
 		}
 
@@ -76,7 +86,7 @@ public class PostalAddress {
 				@SuppressWarnings("deprecation")
 				List<Address> results = geocoder.getFromLocation(latitude, longitude, 1);
 				callback.accept(results != null && !results.isEmpty() ? results.get(0) : null);
-			} catch (IOException e) {
+			} catch (IOException | RuntimeException e) {
 				Log.e("PostalAddress", "Geocoder failed", e);
 				callback.accept(null);
 			}
