@@ -30,9 +30,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class HttpClient {
@@ -93,17 +95,42 @@ public class HttpClient {
 	private static final List<Runnable> listCompleteCallbackAfterRefreshTokenFinished = new ArrayList<>();
 
 	protected final Context context;
-	private RequestQueue mRequestQueue;
+	// File partagée entre instances, pour pouvoir annuler une requête depuis n'importe quel HttpClient
+	private static RequestQueue mRequestQueue;
+	// Tags annulés : une requête ajoutée après l'annulation (ex. encodage photo lent) est ignorée
+	private static final Set<String> cancelledTags = new HashSet<>();
 
 	public HttpClient(Context context) {
 		this.context = context;
 	}
 
 	private RequestQueue getRequestQueue() {
-		if (null == mRequestQueue) {
-			mRequestQueue = Volley.newRequestQueue(context);
+		synchronized (HttpClient.class) {
+			if (null == mRequestQueue) {
+				mRequestQueue = Volley.newRequestQueue(context.getApplicationContext());
+			}
+			return mRequestQueue;
 		}
-		return mRequestQueue;
+	}
+
+	/**
+	 * Annule les requêtes portant ce tag, en cours ou à venir : leurs callbacks ne sont plus appelés.
+	 * Le tag doit être unique à la requête (ex. UUID), car il ne pourra plus être utilisé ensuite.
+	 * @param tag tag unique de la requête à annuler
+	 */
+	public static void cancelAll(String tag) {
+		synchronized (HttpClient.class) {
+			cancelledTags.add(tag);
+			if (null != mRequestQueue) {
+				mRequestQueue.cancelAll(tag);
+			}
+		}
+	}
+
+	private static boolean isCancelled(String tag) {
+		synchronized (HttpClient.class) {
+			return cancelledTags.contains(tag);
+		}
 	}
 
 	// =============================================================================================
@@ -205,6 +232,11 @@ public class HttpClient {
 	}
 
 	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout) {
+		if (isCancelled(tag)) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
 		String urlAndQueryString = url;
 		if (method.equals(HTTPMethod.GET)) {
 			urlAndQueryString += (url.contains("?") ? "" : "?") + URL.buildQueryString(requestParams);
@@ -269,6 +301,11 @@ public class HttpClient {
 				}
 			}
 		}
+		if (isCancelled(tag)) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
 		Log.d(TAG, "URL : " + url + " ; multipart : " + requestParams.size() + " champs texte, " + totalFiles + " fichiers");
 
 		getRequestQueue().add(
