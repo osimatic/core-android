@@ -95,42 +95,17 @@ public class HttpClient {
 	private static final List<Runnable> listCompleteCallbackAfterRefreshTokenFinished = new ArrayList<>();
 
 	protected final Context context;
-	// File partagée entre instances, pour pouvoir annuler une requête depuis n'importe quel HttpClient
-	private static RequestQueue mRequestQueue;
-	// Tags annulés : une requête ajoutée après l'annulation (ex. encodage photo lent) est ignorée
-	private static final Set<String> cancelledTags = new HashSet<>();
+	private RequestQueue mRequestQueue;
 
 	public HttpClient(Context context) {
 		this.context = context;
 	}
 
 	private RequestQueue getRequestQueue() {
-		synchronized (HttpClient.class) {
-			if (null == mRequestQueue) {
-				mRequestQueue = Volley.newRequestQueue(context.getApplicationContext());
-			}
-			return mRequestQueue;
+		if (null == mRequestQueue) {
+			mRequestQueue = Volley.newRequestQueue(context);
 		}
-	}
-
-	/**
-	 * Annule les requêtes portant ce tag, en cours ou à venir : leurs callbacks ne sont plus appelés.
-	 * Le tag doit être unique à la requête (ex. UUID), car il ne pourra plus être utilisé ensuite.
-	 * @param tag tag unique de la requête à annuler
-	 */
-	public static void cancelAll(String tag) {
-		synchronized (HttpClient.class) {
-			cancelledTags.add(tag);
-			if (null != mRequestQueue) {
-				mRequestQueue.cancelAll(tag);
-			}
-		}
-	}
-
-	private static boolean isCancelled(String tag) {
-		synchronized (HttpClient.class) {
-			return cancelledTags.contains(tag);
-		}
+		return mRequestQueue;
 	}
 
 	// =============================================================================================
