@@ -30,11 +30,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public class HttpClient {
@@ -99,6 +97,14 @@ public class HttpClient {
 
 	public HttpClient(Context context) {
 		this.context = context;
+	}
+
+	// Ajoute la requête à la file et la rattache à son canceller ; une relance après refresh du token est rattachée à son tour
+	private <T> void addRequest(Request<T> request, @Nullable HttpRequestCanceller canceller) {
+		Request<T> addedRequest = getRequestQueue().add(request);
+		if (null != canceller) {
+			canceller.attach(addedRequest);
+		}
 	}
 
 	private RequestQueue getRequestQueue() {
@@ -207,7 +213,11 @@ public class HttpClient {
 	}
 
 	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout) {
-		if (isCancelled(tag)) {
+		request(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, timeout, null);
+	}
+
+	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout, @Nullable HttpRequestCanceller canceller) {
+		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
 			return;
 		}
@@ -222,37 +232,36 @@ public class HttpClient {
 		Log.d(TAG, "URL : " + urlAndQueryString + " ; method : " + method + (!method.equals(HTTPMethod.GET) ? " ; requestParams : " + URL.buildQueryString(requestParams) : ""));
 
 		final String finalUrl = url;
-		getRequestQueue().add(
-			new StringRequest(parseHttpMethod(method), urlAndQueryString,
-					response -> {
-						Log.d(TAG, "HTTP Success : data : " + response);
-						if (null != onSuccessListener) {
-							onSuccessListener.onSuccess(response);
-						}
-					},
-					error -> _onErrorResponse(
-							error,
-							onErrorListener,
-							sendAuthorizationHeader,
-							() -> request(tag, method, finalUrl, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, timeout)
-					)
-			) {
-				@Override
-				protected Map<String, String> getParams() {
-					if (method.equals(HTTPMethod.POST) || method.equals(HTTPMethod.PATCH) || method.equals(HTTPMethod.DELETE)) {
-						return requestParams;
+		Request<String> httpRequest = new StringRequest(parseHttpMethod(method), urlAndQueryString,
+				response -> {
+					Log.d(TAG, "HTTP Success : data : " + response);
+					if (null != onSuccessListener) {
+						onSuccessListener.onSuccess(response);
 					}
-					return new HashMap<>();
+				},
+				error -> _onErrorResponse(
+						error,
+						onErrorListener,
+						sendAuthorizationHeader,
+						() -> request(tag, method, finalUrl, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, timeout, canceller)
+				)
+		) {
+			@Override
+			protected Map<String, String> getParams() {
+				if (method.equals(HTTPMethod.POST) || method.equals(HTTPMethod.PATCH) || method.equals(HTTPMethod.DELETE)) {
+					return requestParams;
 				}
-
-				@Override
-				public Map<String, String> getHeaders() {
-					return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
-				}
+				return new HashMap<>();
 			}
-			.setTag(tag)
-			.setRetryPolicy(new DefaultRetryPolicy(timeout * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-		);
+
+			@Override
+			public Map<String, String> getHeaders() {
+				return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
+			}
+		};
+		httpRequest.setTag(tag);
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(timeout * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		addRequest(httpRequest, canceller);
 	}
 
 	// =============================================================================================
@@ -264,6 +273,10 @@ public class HttpClient {
 	}
 
 	public void multipartRequest(String tag, String url, HashMap<String, String> requestParams, Map<String, List<byte[]>> filesByFieldName, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader) {
+		multipartRequest(tag, url, requestParams, filesByFieldName, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, null);
+	}
+
+	public void multipartRequest(String tag, String url, HashMap<String, String> requestParams, Map<String, List<byte[]>> filesByFieldName, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
 		final String boundary = generateBoundary();
 		final String lineEnd = "\r\n";
 		final String twoHyphens = "--";
@@ -276,101 +289,100 @@ public class HttpClient {
 				}
 			}
 		}
-		if (isCancelled(tag)) {
+		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
 			return;
 		}
 
 		Log.d(TAG, "URL : " + url + " ; multipart : " + requestParams.size() + " champs texte, " + totalFiles + " fichiers");
 
-		getRequestQueue().add(
-			new Request<String>(Request.Method.POST, url,
-					error -> _onErrorResponse(
-							error,
-							onErrorListener,
-							sendAuthorizationHeader,
-							() -> multipartRequest(tag, url, requestParams, filesByFieldName, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader)
-					)
-			) {
-				@Override
-				public String getBodyContentType() {
-					return "multipart/form-data; boundary=" + boundary;
-				}
+		Request<String> httpRequest = new Request<String>(Request.Method.POST, url,
+				error -> _onErrorResponse(
+						error,
+						onErrorListener,
+						sendAuthorizationHeader,
+						() -> multipartRequest(tag, url, requestParams, filesByFieldName, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller)
+				)
+		) {
+			@Override
+			public String getBodyContentType() {
+				return "multipart/form-data; boundary=" + boundary;
+			}
 
-				@Override
-				public byte[] getBody() {
-					ByteArrayOutputStream body = new ByteArrayOutputStream();
-					try {
-						// champs texte
-						for (Map.Entry<String, String> entry : requestParams.entrySet()) {
-							String value = (null != entry.getValue() ? entry.getValue() : "");
-							body.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
-							body.write(("Content-Disposition: form-data; name=\"" + entry.getKey() + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
-							body.write(("Content-Type: text/plain; charset=UTF-8" + lineEnd).getBytes(StandardCharsets.UTF_8));
-							body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-							body.write(value.getBytes(StandardCharsets.UTF_8));
-							body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-						}
-						// fichiers binaires, détection MIME par fichier via magic bytes
-						if (null != filesByFieldName) {
-							for (Map.Entry<String, List<byte[]>> fileEntry : filesByFieldName.entrySet()) {
-								String fieldName = fileEntry.getKey();
-								List<byte[]> files = fileEntry.getValue();
-								if (null == files) {
+			@Override
+			public byte[] getBody() {
+				ByteArrayOutputStream body = new ByteArrayOutputStream();
+				try {
+					// champs texte
+					for (Map.Entry<String, String> entry : requestParams.entrySet()) {
+						String value = (null != entry.getValue() ? entry.getValue() : "");
+						body.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
+						body.write(("Content-Disposition: form-data; name=\"" + entry.getKey() + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
+						body.write(("Content-Type: text/plain; charset=UTF-8" + lineEnd).getBytes(StandardCharsets.UTF_8));
+						body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+						body.write(value.getBytes(StandardCharsets.UTF_8));
+						body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+					}
+					// fichiers binaires, détection MIME par fichier via magic bytes
+					if (null != filesByFieldName) {
+						for (Map.Entry<String, List<byte[]>> fileEntry : filesByFieldName.entrySet()) {
+							String fieldName = fileEntry.getKey();
+							List<byte[]> files = fileEntry.getValue();
+							if (null == files) {
+								continue;
+							}
+							int index = 0;
+							for (byte[] fileBytes : files) {
+								if (null == fileBytes) {
 									continue;
 								}
-								int index = 0;
-								for (byte[] fileBytes : files) {
-									if (null == fileBytes) {
-										continue;
-									}
-									String fileMimeType = File.detectMimeType(fileBytes);
-									String filename = fieldName + "_" + index + "." + File.getFileExtension(fileMimeType);
-									body.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
-									body.write(("Content-Disposition: form-data; name=\"" + fieldName + "[]\"; filename=\"" + filename + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
-									body.write(("Content-Type: " + fileMimeType + lineEnd).getBytes(StandardCharsets.UTF_8));
-									body.write(("Content-Transfer-Encoding: binary" + lineEnd).getBytes(StandardCharsets.UTF_8));
-									body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-									body.write(fileBytes);
-									body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
-									index++;
-								}
+								String fileMimeType = File.detectMimeType(fileBytes);
+								String filename = fieldName + "_" + index + "." + File.getFileExtension(fileMimeType);
+								body.write((twoHyphens + boundary + lineEnd).getBytes(StandardCharsets.UTF_8));
+								body.write(("Content-Disposition: form-data; name=\"" + fieldName + "[]\"; filename=\"" + filename + "\"" + lineEnd).getBytes(StandardCharsets.UTF_8));
+								body.write(("Content-Type: " + fileMimeType + lineEnd).getBytes(StandardCharsets.UTF_8));
+								body.write(("Content-Transfer-Encoding: binary" + lineEnd).getBytes(StandardCharsets.UTF_8));
+								body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+								body.write(fileBytes);
+								body.write(lineEnd.getBytes(StandardCharsets.UTF_8));
+								index++;
 							}
 						}
-						// fermeture boundary
-						body.write((twoHyphens + boundary + twoHyphens + lineEnd).getBytes(StandardCharsets.UTF_8));
-					} catch (IOException e) {
-						Log.e(TAG, "multipartRequest getBody : " + e.getMessage());
 					}
-					return body.toByteArray();
+					// fermeture boundary
+					body.write((twoHyphens + boundary + twoHyphens + lineEnd).getBytes(StandardCharsets.UTF_8));
+				} catch (IOException e) {
+					Log.e(TAG, "multipartRequest getBody : " + e.getMessage());
 				}
+				return body.toByteArray();
+			}
 
-				@Override
-				protected Response<String> parseNetworkResponse(NetworkResponse response) {
-					try {
-						String body = new String(response.data, HttpHeaderParser.parseCharset(response.headers, "UTF-8"));
-						return Response.success(body, HttpHeaderParser.parseCacheHeaders(response));
-					} catch (Exception e) {
-						return Response.error(new ParseError(e));
-					}
-				}
-
-				@Override
-				protected void deliverResponse(String response) {
-					Log.d(TAG, "HTTP Success : data : " + response);
-					if (null != onSuccessListener) {
-						onSuccessListener.onSuccess(response);
-					}
-				}
-
-				@Override
-				public Map<String, String> getHeaders() {
-					return HttpClient.getHttpHeaders(additionalHeaders, sendAuthorizationHeader ? authorizationToken : null);
+			@Override
+			protected Response<String> parseNetworkResponse(NetworkResponse response) {
+				try {
+					String body = new String(response.data, HttpHeaderParser.parseCharset(response.headers, "UTF-8"));
+					return Response.success(body, HttpHeaderParser.parseCacheHeaders(response));
+				} catch (Exception e) {
+					return Response.error(new ParseError(e));
 				}
 			}
-			.setTag(tag)
-			.setRetryPolicy(new DefaultRetryPolicy(30 * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-		);
+
+			@Override
+			protected void deliverResponse(String response) {
+				Log.d(TAG, "HTTP Success : data : " + response);
+				if (null != onSuccessListener) {
+					onSuccessListener.onSuccess(response);
+				}
+			}
+
+			@Override
+			public Map<String, String> getHeaders() {
+				return HttpClient.getHttpHeaders(additionalHeaders, sendAuthorizationHeader ? authorizationToken : null);
+			}
+		};
+		httpRequest.setTag(tag);
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(30 * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		addRequest(httpRequest, canceller);
 	}
 
 	// =============================================================================================
@@ -378,27 +390,35 @@ public class HttpClient {
 	// =============================================================================================
 
 	public void downloadFile(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<byte[]> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader) {
-		getRequestQueue().add(
-			new InputStreamVolleyRequest(method,
-					url,
-					response -> {
-						Log.d(TAG, "HTTP Success : response size : " + response.length);
-						if (null != onSuccessListener) {
-							onSuccessListener.onSuccess(response);
-						}
-					},
-					error -> _onErrorResponse(
-							error,
-							onErrorListener,
-							sendAuthorizationHeader,
-							() -> downloadFile(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader)
-					),
-					requestParams,
-					HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false))
-			.setShouldCache(true)
-			.setTag(tag)
-			.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-		);
+		downloadFile(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, null);
+	}
+
+	public void downloadFile(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<byte[]> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
+		if (null != canceller && canceller.isCancelled()) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
+		Request<byte[]> httpRequest = new InputStreamVolleyRequest(method,
+				url,
+				response -> {
+					Log.d(TAG, "HTTP Success : response size : " + response.length);
+					if (null != onSuccessListener) {
+						onSuccessListener.onSuccess(response);
+					}
+				},
+				error -> _onErrorResponse(
+						error,
+						onErrorListener,
+						sendAuthorizationHeader,
+						() -> downloadFile(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller)
+				),
+				requestParams,
+				HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false));
+		httpRequest.setShouldCache(true);
+		httpRequest.setTag(tag);
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		addRequest(httpRequest, canceller);
 	}
 
 	// =============================================================================================
@@ -414,36 +434,44 @@ public class HttpClient {
 	}
 
 	public void imageRequest(String tag, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<Bitmap> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader) {
+		imageRequest(tag, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, null);
+	}
+
+	public void imageRequest(String tag, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<Bitmap> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
+		if (null != canceller && canceller.isCancelled()) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
 		String urlAndQueryString = url + (url.contains("?") ? "" : "?") + URL.buildQueryString(requestParams);
 		Log.d(TAG, "URL : " + url);
 
-		getRequestQueue().add(
-			new ImageRequest(urlAndQueryString,
-					response -> {
-						Log.d(TAG, "HTTP Success");
-						if (null != onSuccessListener) {
-							onSuccessListener.onSuccess(response);
-						}
-					},
-					0,
-					0,
-					null,
-					null,
-					error -> _onErrorResponse(
-							error,
-							onErrorListener,
-							sendAuthorizationHeader,
-							() -> imageRequest(tag, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader)
-					)
-			) {
-				@Override
-				public Map<String, String> getHeaders() {
-					return HttpClient.getHttpHeaders(HTTPMethod.GET, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
-				}
+		Request<Bitmap> httpRequest = new ImageRequest(urlAndQueryString,
+				response -> {
+					Log.d(TAG, "HTTP Success");
+					if (null != onSuccessListener) {
+						onSuccessListener.onSuccess(response);
+					}
+				},
+				0,
+				0,
+				null,
+				null,
+				error -> _onErrorResponse(
+						error,
+						onErrorListener,
+						sendAuthorizationHeader,
+						() -> imageRequest(tag, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller)
+				)
+		) {
+			@Override
+			public Map<String, String> getHeaders() {
+				return HttpClient.getHttpHeaders(HTTPMethod.GET, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
 			}
-			.setTag(tag)
-			.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-		);
+		};
+		httpRequest.setTag(tag);
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		addRequest(httpRequest, canceller);
 	}
 
 	// =============================================================================================
@@ -455,6 +483,15 @@ public class HttpClient {
 	}
 
 	public void jsonArrayRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONArray> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader) {
+		jsonArrayRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, null);
+	}
+
+	public void jsonArrayRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONArray> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
+		if (null != canceller && canceller.isCancelled()) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
 		String urlAndQueryString = url;
 		if (method.equals(HTTPMethod.GET)) {
 			urlAndQueryString += (url.contains("?") ? "" : "?") + URL.buildQueryString(requestParams);
@@ -464,37 +501,36 @@ public class HttpClient {
 
 		Log.d(TAG, "URL : " + urlAndQueryString + (!method.equals(HTTPMethod.GET) ? " ; requestParams : " + URL.buildQueryString(requestParams) : ""));
 
-		getRequestQueue().add(
-			new JsonArrayRequest(parseHttpMethod(method), url, null,
-					response -> {
-						Log.d(TAG, "HTTP Success : data : " + response.toString());
-						if (null != onSuccessListener) {
-							onSuccessListener.onSuccess(response);
-						}
-					},
-					error -> _onErrorResponse(
-							error,
-							onErrorListener,
-							sendAuthorizationHeader,
-							() -> jsonArrayRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader)
-					)
-			) {
-				@Override
-				protected Map<String, String> getParams() {
-					if (method.equals(HTTPMethod.POST)) {
-						return requestParams;
+		Request<JSONArray> httpRequest = new JsonArrayRequest(parseHttpMethod(method), url, null,
+				response -> {
+					Log.d(TAG, "HTTP Success : data : " + response.toString());
+					if (null != onSuccessListener) {
+						onSuccessListener.onSuccess(response);
 					}
-					return new HashMap<>();
+				},
+				error -> _onErrorResponse(
+						error,
+						onErrorListener,
+						sendAuthorizationHeader,
+						() -> jsonArrayRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller)
+				)
+		) {
+			@Override
+			protected Map<String, String> getParams() {
+				if (method.equals(HTTPMethod.POST)) {
+					return requestParams;
 				}
-
-				@Override
-				public Map<String, String> getHeaders() {
-					return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
-				}
+				return new HashMap<>();
 			}
-			.setTag(tag)
-			.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-		);
+
+			@Override
+			public Map<String, String> getHeaders() {
+				return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false);
+			}
+		};
+		httpRequest.setTag(tag);
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		addRequest(httpRequest, canceller);
 	}
 
 	// =============================================================================================
@@ -510,6 +546,15 @@ public class HttpClient {
 	}
 
 	public void jsonObjectRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONObject> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, boolean dataAsJson) {
+		jsonObjectRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, dataAsJson, null);
+	}
+
+	public void jsonObjectRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONObject> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, boolean dataAsJson, @Nullable HttpRequestCanceller canceller) {
+		if (null != canceller && canceller.isCancelled()) {
+			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			return;
+		}
+
 		String urlAndQueryString = url;
 		if (method.equals(HTTPMethod.GET)) {
 			urlAndQueryString += (url.contains("?") ? "" : "?") + URL.buildQueryString(requestParams);
@@ -522,37 +567,36 @@ public class HttpClient {
 
 			Log.d(TAG, "URL : " + urlAndQueryString + (!method.equals(HTTPMethod.GET) ? " ; requestParams : " + (dataAsJson ? jsonData.toString() : URL.buildQueryString(requestParams)) : ""));
 
-			getRequestQueue().add(
-				new JsonObjectRequest(parseHttpMethod(method), url, dataAsJson ? jsonData : null,
-						response -> {
-							Log.d(TAG, "HTTP Success : data : " + response.toString());
-							if (null != onSuccessListener) {
-								onSuccessListener.onSuccess(response);
-							}
-						},
-						error -> _onErrorResponse(
-								error,
-								onErrorListener,
-								sendAuthorizationHeader,
-								() -> jsonObjectRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, dataAsJson)
-						)
-				) {
-					@Override
-					protected Map<String, String> getParams() {
-						if (!dataAsJson && method.equals(HTTPMethod.POST)) {
-							return requestParams;
+			Request<JSONObject> httpRequest = new JsonObjectRequest(parseHttpMethod(method), url, dataAsJson ? jsonData : null,
+					response -> {
+						Log.d(TAG, "HTTP Success : data : " + response.toString());
+						if (null != onSuccessListener) {
+							onSuccessListener.onSuccess(response);
 						}
-						return new HashMap<>();
+					},
+					error -> _onErrorResponse(
+							error,
+							onErrorListener,
+							sendAuthorizationHeader,
+							() -> jsonObjectRequest(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, dataAsJson, canceller)
+					)
+			) {
+				@Override
+				protected Map<String, String> getParams() {
+					if (!dataAsJson && method.equals(HTTPMethod.POST)) {
+						return requestParams;
 					}
-
-					@Override
-					public Map<String, String> getHeaders() {
-						return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, dataAsJson);
-					}
+					return new HashMap<>();
 				}
-				.setTag(tag)
-				.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT))
-			);
+
+				@Override
+				public Map<String, String> getHeaders() {
+					return HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, dataAsJson);
+				}
+			};
+			httpRequest.setTag(tag);
+			httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+			addRequest(httpRequest, canceller);
 		} catch (Exception e) {
 			Log.e(TAG, "jsonObjectRequest error : " + e.getMessage());
 		}
