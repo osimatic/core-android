@@ -33,15 +33,8 @@ public class PendingJsonQueue {
 	/** Clé JSON marquant un élément refusé par le serveur : il reste dans la queue sans être renvoyé. */
 	public static final String KEY_REJECTED = "rejected";
 
-	/** Résultat de l'envoi d'un élément par {@link ItemSender}. */
-	public enum SendOutcome {
-		/** Envoi réussi : l'élément est retiré de la queue. */
-		SENT,
-		/** Refus définitif : l'élément est marqué {@link #KEY_REJECTED} et conservé dans la queue. */
-		REJECTED,
-		/** Échec temporaire : la synchronisation s'arrête, l'élément et les suivants sont conservés. */
-		RETRY
-	}
+	/** Clé JSON du motif de refus renvoyé par le serveur, présente uniquement sur un élément marqué {@link #KEY_REJECTED}. */
+	public static final String KEY_REJECTION_REASON = "rejection_reason";
 
 	/** Envoie un élément de la queue et retourne son résultat. */
 	public interface ItemSender {
@@ -116,7 +109,7 @@ public class PendingJsonQueue {
 	 * Envoie les éléments dans l'ordre, de manière synchrone.
 	 *
 	 * <p>Les éléments déjà marqués {@link #KEY_REJECTED} sont conservés sans être envoyés.
-	 * Après un {@link SendOutcome#RETRY}, les éléments suivants sont conservés sans être envoyés.
+	 * Après un résultat {@link SendOutcome.Type#RETRY}, les éléments suivants sont conservés sans être envoyés.
 	 * Les éléments ajoutés pendant la synchronisation sont conservés à la fin de la queue.</p>
 	 *
 	 * @param sender envoie chaque élément et retourne son résultat
@@ -134,11 +127,11 @@ public class PendingJsonQueue {
 			}
 
 			SendOutcome outcome = sender.send(item);
-			if (SendOutcome.RETRY == outcome) {
+			if (SendOutcome.Type.RETRY == outcome.type) {
 				retry = true;
 				updated.add(item);
-			} else if (SendOutcome.REJECTED == outcome) {
-				markAsRejected(item);
+			} else if (SendOutcome.Type.REJECTED == outcome.type) {
+				markAsRejected(item, outcome.reason);
 				updated.add(item);
 			}
 			// SENT : l'élément n'est pas reconservé
@@ -150,9 +143,12 @@ public class PendingJsonQueue {
 
 	// --- Helpers ---
 
-	private static void markAsRejected(JSONObject item) {
+	private static void markAsRejected(JSONObject item, String reason) {
 		try {
 			item.put(KEY_REJECTED, true);
+			if (null != reason) {
+				item.put(KEY_REJECTION_REASON, reason);
+			}
 		} catch (JSONException e) {
 			Log.e(TAG, "impossible de marquer l'élément refusé : " + e.getMessage());
 		}

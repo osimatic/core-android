@@ -99,11 +99,18 @@ public class HttpClient {
 		this.context = context;
 	}
 
+	// Requête annulée avant envoi : le callback d'erreur est appelé une seule fois, avec le code d'annulation
+	private static void notifyCancelledBeforeSend(@Nullable HTTPResponse.ErrorListener onErrorListener) {
+		if (null != onErrorListener) {
+			onErrorListener.onError(HttpRequestCanceller.CANCELLED_CODE, null);
+		}
+	}
+
 	// Ajoute la requête à la file et la rattache à son canceller ; une relance après refresh du token est rattachée à son tour
-	private <T> void addRequest(Request<T> request, @Nullable HttpRequestCanceller canceller) {
+	private <T> void addRequest(Request<T> request, @Nullable HttpRequestCanceller canceller, @Nullable HTTPResponse.ErrorListener onErrorListener) {
 		Request<T> addedRequest = getRequestQueue().add(request);
 		if (null != canceller) {
-			canceller.attach(addedRequest);
+			canceller.attach(addedRequest, onErrorListener);
 		}
 	}
 
@@ -219,6 +226,7 @@ public class HttpClient {
 	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout, @Nullable HttpRequestCanceller canceller) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -261,7 +269,7 @@ public class HttpClient {
 		};
 		httpRequest.setTag(tag);
 		httpRequest.setRetryPolicy(new DefaultRetryPolicy(timeout * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-		addRequest(httpRequest, canceller);
+		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
 	// =============================================================================================
@@ -291,6 +299,7 @@ public class HttpClient {
 		}
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -382,7 +391,7 @@ public class HttpClient {
 		};
 		httpRequest.setTag(tag);
 		httpRequest.setRetryPolicy(new DefaultRetryPolicy(30 * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-		addRequest(httpRequest, canceller);
+		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
 	// =============================================================================================
@@ -396,6 +405,7 @@ public class HttpClient {
 	public void downloadFile(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<byte[]> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -414,11 +424,12 @@ public class HttpClient {
 						() -> downloadFile(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller)
 				),
 				requestParams,
-				HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false));
+				HttpClient.getHttpHeaders(method, additionalHeaders, sendAuthorizationHeader ? authorizationToken : null, false))
+		;
 		httpRequest.setShouldCache(true);
 		httpRequest.setTag(tag);
 		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-		addRequest(httpRequest, canceller);
+		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
 	// =============================================================================================
@@ -440,6 +451,7 @@ public class HttpClient {
 	public void imageRequest(String tag, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<Bitmap> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -471,7 +483,7 @@ public class HttpClient {
 		};
 		httpRequest.setTag(tag);
 		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-		addRequest(httpRequest, canceller);
+		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
 	// =============================================================================================
@@ -489,6 +501,7 @@ public class HttpClient {
 	public void jsonArrayRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONArray> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -530,7 +543,7 @@ public class HttpClient {
 		};
 		httpRequest.setTag(tag);
 		httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-		addRequest(httpRequest, canceller);
+		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
 	// =============================================================================================
@@ -552,6 +565,7 @@ public class HttpClient {
 	public void jsonObjectRequest(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<JSONObject> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, boolean dataAsJson, @Nullable HttpRequestCanceller canceller) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
+			notifyCancelledBeforeSend(onErrorListener);
 			return;
 		}
 
@@ -596,7 +610,7 @@ public class HttpClient {
 			};
 			httpRequest.setTag(tag);
 			httpRequest.setRetryPolicy(new DefaultRetryPolicy(5000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-			addRequest(httpRequest, canceller);
+			addRequest(httpRequest, canceller, onErrorListener);
 		} catch (Exception e) {
 			Log.e(TAG, "jsonObjectRequest error : " + e.getMessage());
 		}

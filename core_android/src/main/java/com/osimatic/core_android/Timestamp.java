@@ -92,6 +92,16 @@ public class Timestamp {
 		return c.getTimeInMillis();
 	}
 
+	/**
+	 * Indique si un horodatage est récent : son âge doit être inférieur ou égal à maxAgeInMillis.
+	 * @param timestampInMillis horodatage en millisecondes depuis l'époque (0 renvoie false)
+	 * @param maxAgeInMillis âge maximal accepté, en millisecondes
+	 * @return true si l'horodatage est récent
+	 */
+	public static boolean isWithin(long timestampInMillis, long maxAgeInMillis) {
+		return System.currentTimeMillis() - timestampInMillis <= maxAgeInMillis;
+	}
+
 	public static long getFirsDayOfMonth(int year, int month, String timeZone) {
 		return make(year, month, 1, timeZone);
 	}
