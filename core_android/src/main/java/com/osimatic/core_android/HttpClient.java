@@ -224,6 +224,14 @@ public class HttpClient {
 	}
 
 	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout, @Nullable HttpRequestCanceller canceller) {
+		request(tag, method, url, requestParams, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, timeout, canceller, DefaultRetryPolicy.DEFAULT_MAX_RETRIES);
+	}
+
+	/**
+	 * Same as the request above, with an explicit number of automatic Volley retries.
+	 * Use 0 for a signed request: a retry re-sends the same signature headers (same nonce), which the server rejects as a replay.
+	 */
+	public void request(String tag, String method, String url, HashMap<String, String> requestParams, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, int timeout, @Nullable HttpRequestCanceller canceller, int maxRetries) {
 		if (null != canceller && canceller.isCancelled()) {
 			Log.d(TAG, "Requête annulée, non envoyée : " + url);
 			notifyCancelledBeforeSend(onErrorListener);
@@ -268,7 +276,7 @@ public class HttpClient {
 			}
 		};
 		httpRequest.setTag(tag);
-		httpRequest.setRetryPolicy(new DefaultRetryPolicy(timeout * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(timeout * 1000, maxRetries, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
 		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
@@ -285,6 +293,13 @@ public class HttpClient {
 	}
 
 	public void multipartRequest(String tag, String url, HashMap<String, String> requestParams, Map<String, List<byte[]>> filesByFieldName, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller) {
+		multipartRequest(tag, url, requestParams, filesByFieldName, onSuccessListener, onErrorListener, additionalHeaders, sendAuthorizationHeader, canceller, DefaultRetryPolicy.DEFAULT_MAX_RETRIES);
+	}
+
+	/**
+	 * Same as the multipart request above, with an explicit number of automatic Volley retries (0 for a signed request, see request()).
+	 */
+	public void multipartRequest(String tag, String url, HashMap<String, String> requestParams, Map<String, List<byte[]>> filesByFieldName, @Nullable HTTPResponse.SuccessListener<String> onSuccessListener, @Nullable HTTPResponse.ErrorListener onErrorListener, @Nullable HashMap<String, String> additionalHeaders, boolean sendAuthorizationHeader, @Nullable HttpRequestCanceller canceller, int maxRetries) {
 		final String boundary = generateBoundary();
 		final String lineEnd = "\r\n";
 		final String twoHyphens = "--";
@@ -390,7 +405,7 @@ public class HttpClient {
 			}
 		};
 		httpRequest.setTag(tag);
-		httpRequest.setRetryPolicy(new DefaultRetryPolicy(30 * 1000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+		httpRequest.setRetryPolicy(new DefaultRetryPolicy(30 * 1000, maxRetries, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
 		addRequest(httpRequest, canceller, onErrorListener);
 	}
 
