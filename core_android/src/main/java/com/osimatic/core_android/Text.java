@@ -13,6 +13,8 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 import java.text.Normalizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Utility class providing helper methods for text and string manipulation.
@@ -218,6 +220,53 @@ public class Text {
 				sb.appendCodePoint(Character.toUpperCase(word.codePointAt(0)));
 			}
 		}
+		return sb.toString();
+	}
+
+	/**
+	 * Handles singular/plural forms in a string based on a number.
+	 *
+	 * <p>{@code {#}} is replaced by the number. Each {@code {...}} group holds up to three alternatives separated by {@code |}, and is replaced by the one matching the number:
+	 * <ul>
+	 *   <li>three alternatives: zero, singular (1), plural;</li>
+	 *   <li>two alternatives: singular (0 and 1), plural;</li>
+	 *   <li>one alternative: empty for 0 and 1, the alternative otherwise.</li>
+	 * </ul>
+	 *
+	 * <pre>
+	 * pluralize("{No item|1 item|{#} items}", 0)  = "No item"
+	 * pluralize("{No item|1 item|{#} items}", 1)  = "1 item"
+	 * pluralize("{No item|1 item|{#} items}", 5)  = "5 items"
+	 * pluralize("{#} pointage{s}", 1)             = "1 pointage"
+	 * pluralize("{#} pointage{s}", 3)             = "3 pointages"
+	 * pluralize("{#} {cheval|chevaux}", 3)        = "3 chevaux"
+	 * </pre>
+	 *
+	 * @param string the string to convert to singular or plural form; may be {@code null}
+	 * @param nb     the number of elements that determines whether the string is singular or plural
+	 * @return the string in singular or plural form, or {@code null} if {@code string} is {@code null}
+	 */
+	public static String pluralize(String string, double nb) {
+		if (string == null) return null;
+		boolean isWholeNumber = !Double.isInfinite(nb) && nb == Math.rint(nb);
+		String result = string.replace("{#}", isWholeNumber ? String.valueOf((long) nb) : String.valueOf(nb));
+
+		Matcher matcher = Pattern.compile("\\{(.*?)\\}").matcher(result);
+		StringBuilder sb = new StringBuilder();
+		while (matcher.find()) {
+			// Limit -1 keeps trailing empty alternatives, as in "{|aux}"
+			String[] parts = matcher.group(1).split("\\|", -1);
+			String mod;
+			if (nb == 0) {
+				mod = parts.length == 1 ? "" : parts[0];
+			} else if (nb == 1) {
+				mod = parts.length == 1 ? "" : (parts.length == 2 ? parts[0] : parts[1]);
+			} else {
+				mod = parts.length == 1 ? parts[0] : (parts.length == 2 ? parts[1] : parts[2]);
+			}
+			matcher.appendReplacement(sb, Matcher.quoteReplacement(mod));
+		}
+		matcher.appendTail(sb);
 		return sb.toString();
 	}
 

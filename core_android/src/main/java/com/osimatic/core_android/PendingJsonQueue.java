@@ -36,6 +36,15 @@ public class PendingJsonQueue {
 	/** Clé JSON du motif de refus renvoyé par le serveur, présente uniquement sur un élément marqué {@link #KEY_REJECTED}. */
 	public static final String KEY_REJECTION_REASON = "rejection_reason";
 
+	/** JSON key of the time (milliseconds since epoch) at which an item was marked {@link #KEY_REJECTED}. */
+	public static final String KEY_REJECTED_AT = "rejected_at";
+
+	/**
+	 * Lock serializing every read-modify-write of a queue, so that an item enqueued while a drain rewrites the queue is not lost.
+	 * Shared by all queues: operations are short and never hold the lock while sending an item.
+	 */
+	private static final Object LOCK = new Object();
+
 	/** Envoie un élément de la queue et retourne son résultat. */
 	public interface ItemSender {
 		SendOutcome send(JSONObject item);
@@ -55,10 +64,12 @@ public class PendingJsonQueue {
 
 	/** Ajoute un item à la queue. */
 	public void enqueue(JSONObject item) {
-		JSONArray queue = load();
-		queue.put(item);
-		save(queue);
-		Log.d(TAG, "[" + name + "] item ajouté (total : " + queue.length() + ")");
+		synchronized (LOCK) {
+			JSONArray queue = load();
+			queue.put(item);
+			save(queue);
+			Log.d(TAG, "[" + name + "] item ajouté (total : " + queue.length() + ")");
+		}
 	}
 
 	/** Retourne le nombre d'items en attente. */
@@ -87,22 +98,66 @@ public class PendingJsonQueue {
 
 	/** Supprime le premier item (après traitement réussi). */
 	public void removeFirst() {
-		JSONArray queue = load();
-		if (queue.length() == 0) return;
-		JSONArray newQueue = new JSONArray();
-		for (int i = 1; i < queue.length(); i++) {
-			try {
-				newQueue.put(queue.get(i));
-			} catch (JSONException e) {
-				Log.e(TAG, "[" + name + "] erreur purge queue : " + e.getMessage());
+		synchronized (LOCK) {
+			JSONArray queue = load();
+			if (queue.length() == 0) return;
+			JSONArray newQueue = new JSONArray();
+			for (int i = 1; i < queue.length(); i++) {
+				try {
+					newQueue.put(queue.get(i));
+				} catch (JSONException e) {
+					Log.e(TAG, "[" + name + "] erreur purge queue : " + e.getMessage());
+				}
 			}
+			save(newQueue);
 		}
-		save(newQueue);
 	}
 
 	/** Vide entièrement la queue. */
 	public void clearAll() {
 		save(new JSONArray());
+	}
+
+	/** Returns the number of items marked {@link #KEY_REJECTED}. */
+	public int countRejected() {
+		int count = 0;
+		for (JSONObject item : getAll()) {
+			if (item.optBoolean(KEY_REJECTED, false)) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	/**
+	 * Removes the rejected items that were marked more than {@code maxAgeMs} milliseconds ago.
+	 * A rejected item without {@link #KEY_REJECTED_AT} (marked before this key existed) is kept.
+	 * Must not be called while a {@link #drain(ItemSender)} is running (it would shift the items the drain is about to replace): call it just before draining, from the same thread.
+	 *
+	 * @param maxAgeMs maximum age of a rejected item, in milliseconds
+	 * @return the number of removed items
+	 */
+	public int removeRejected(long maxAgeMs) {
+		synchronized (LOCK) {
+			JSONArray queue = load();
+			JSONArray kept = new JSONArray();
+			long limit = System.currentTimeMillis() - maxAgeMs;
+			int removed = 0;
+			for (int i = 0; i < queue.length(); i++) {
+				JSONObject item = queue.optJSONObject(i);
+				boolean isExpired = null != item && item.optBoolean(KEY_REJECTED, false) && item.has(KEY_REJECTED_AT) && item.optLong(KEY_REJECTED_AT, Long.MAX_VALUE) < limit;
+				if (isExpired) {
+					removed++;
+				} else {
+					kept.put(queue.opt(i));
+				}
+			}
+			if (removed > 0) {
+				save(kept);
+				Log.d(TAG, "[" + name + "] " + removed + " item(s) refusé(s) purgé(s)");
+			}
+			return removed;
+		}
 	}
 
 	/**
@@ -146,6 +201,7 @@ public class PendingJsonQueue {
 	private static void markAsRejected(JSONObject item, String reason) {
 		try {
 			item.put(KEY_REJECTED, true);
+			item.put(KEY_REJECTED_AT, System.currentTimeMillis());
 			if (null != reason) {
 				item.put(KEY_REJECTION_REASON, reason);
 			}
@@ -158,15 +214,17 @@ public class PendingJsonQueue {
 	 * Remplace les {@code processedCount} premiers éléments par {@code updated}, en conservant les éléments ajoutés depuis.
 	 */
 	private void replaceHead(int processedCount, List<JSONObject> updated) {
-		JSONArray current = load();
-		JSONArray rebuilt = new JSONArray();
-		for (JSONObject item : updated) {
-			rebuilt.put(item);
+		synchronized (LOCK) {
+			JSONArray current = load();
+			JSONArray rebuilt = new JSONArray();
+			for (JSONObject item : updated) {
+				rebuilt.put(item);
+			}
+			for (int i = Math.min(processedCount, current.length()); i < current.length(); i++) {
+				rebuilt.put(current.opt(i));
+			}
+			save(rebuilt);
 		}
-		for (int i = Math.min(processedCount, current.length()); i < current.length(); i++) {
-			rebuilt.put(current.opt(i));
-		}
-		save(rebuilt);
 	}
 
 	private JSONArray load() {

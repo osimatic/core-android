@@ -25,6 +25,7 @@ import com.osimatic.core_android.photo.PhotoView;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -143,6 +144,41 @@ public class Image {
 	 */
 	public static Bitmap fromByteArray(byte[] data) {
 		return BitmapFactory.decodeByteArray(data, 0, data.length);
+	}
+
+	/**
+	 * Saves the given {@link Bitmap} to a file, creating the parent directory if needed and overwriting any existing file.
+	 *
+	 * <p>Unlike {@link com.osimatic.core_android.File#writeFile(String, byte[])}, a failure is reported to the caller.
+	 *
+	 * @param bitmap         the bitmap to save; must not be {@code null}
+	 * @param file           the destination file; must not be {@code null}
+	 * @param compressFormat the compression format to use (e.g. {@link Bitmap.CompressFormat#JPEG})
+	 * @param quality        the compression quality in the range [0, 100]; ignored for lossless formats such as PNG
+	 * @throws IOException if the parent directory cannot be created, or if the bitmap cannot be compressed or written
+	 * @see #decodeFile(File)
+	 */
+	public static void saveToFile(Bitmap bitmap, File file, Bitmap.CompressFormat compressFormat, int quality) throws IOException {
+		File parent = file.getParentFile();
+		if (null != parent && !parent.exists() && !parent.mkdirs()) {
+			throw new IOException("Unable to create directory " + parent.getAbsolutePath());
+		}
+		try (FileOutputStream out = new FileOutputStream(file)) {
+			if (!bitmap.compress(compressFormat, quality, out)) {
+				throw new IOException("Unable to compress bitmap to " + file.getAbsolutePath());
+			}
+		}
+	}
+
+	/**
+	 * Decodes the image stored in the given file into a {@link Bitmap}.
+	 *
+	 * @param file the image file; must not be {@code null}
+	 * @return the decoded {@link Bitmap}, or {@code null} if the file does not exist or cannot be decoded
+	 * @see #saveToFile(Bitmap, File, Bitmap.CompressFormat, int)
+	 */
+	public static Bitmap decodeFile(File file) {
+		return file.isFile() ? BitmapFactory.decodeFile(file.getAbsolutePath()) : null;
 	}
 
 	// =============================================================================================

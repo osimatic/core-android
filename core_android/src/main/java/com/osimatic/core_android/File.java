@@ -18,6 +18,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.InputStream;
 import java.text.DecimalFormat;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -397,6 +398,33 @@ public class File {
 	 */
 	public static boolean delete(String filePath) {
 		return new java.io.File(filePath).delete();
+	}
+
+	/**
+	 * Deletes the files of a directory whose name is not in the given collection and which were last modified more than the given duration ago.
+	 *
+	 * <p>The minimum age protects a file that has just been written but is not yet referenced by its owner. Sub-directories are left untouched.
+	 *
+	 * @param directoryPath   the absolute path of the directory to clean; must not be {@code null}
+	 * @param fileNamesToKeep the names (without path) of the files to keep; must not be {@code null}
+	 * @param minAgeMs        the minimum time since last modification, in milliseconds, for a file to be deleted
+	 * @return the number of deleted files
+	 * @see java.io.File#lastModified()
+	 */
+	public static int deleteFilesNotIn(String directoryPath, Collection<String> fileNamesToKeep, long minAgeMs) {
+		java.io.File[] files = new java.io.File(directoryPath).listFiles();
+		if (null == files) {
+			return 0;
+		}
+
+		long limit = System.currentTimeMillis() - minAgeMs;
+		int nbDeleted = 0;
+		for (java.io.File file : files) {
+			if (file.isFile() && !fileNamesToKeep.contains(file.getName()) && file.lastModified() < limit && file.delete()) {
+				nbDeleted++;
+			}
+		}
+		return nbDeleted;
 	}
 
 	// =============================================================================================
