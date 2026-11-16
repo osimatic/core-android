@@ -39,6 +39,15 @@ public class PendingJsonQueue {
 	/** JSON key of the time (milliseconds since epoch) at which an item was marked {@link #KEY_REJECTED}. */
 	public static final String KEY_REJECTED_AT = "rejected_at";
 
+	/** Clé JSON du nombre d'envois échoués temporairement (résultat {@link SendOutcome.Type#RETRY}) ; absente tant qu'aucun envoi n'a échoué. */
+	public static final String KEY_ATTEMPTS = "attempts";
+
+	/** Clé JSON de la date (millisecondes depuis epoch) du dernier envoi échoué temporairement. */
+	public static final String KEY_LAST_ATTEMPT_AT = "last_attempt_at";
+
+	/** Clé JSON de la cause du dernier échec temporaire (absente si l'envoi n'a pas fourni de cause). */
+	public static final String KEY_LAST_ERROR = "last_error";
+
 	/**
 	 * Lock serializing every read-modify-write of a queue, so that an item enqueued while a drain rewrites the queue is not lost.
 	 * Shared by all queues: operations are short and never hold the lock while sending an item.
@@ -48,6 +57,11 @@ public class PendingJsonQueue {
 	/** Envoie un élément de la queue et retourne son résultat. */
 	public interface ItemSender {
 		SendOutcome send(JSONObject item);
+	}
+
+	/** Sélectionne les éléments de la queue à traiter (équivalent de Predicate, indisponible avant l'API 24). */
+	public interface ItemMatcher {
+		boolean matches(JSONObject item);
 	}
 
 	private final Context context;
@@ -110,6 +124,34 @@ public class PendingJsonQueue {
 				}
 			}
 			save(newQueue);
+		}
+	}
+
+	/**
+	 * Supprime les éléments sélectionnés par le matcher.
+	 * Ne doit pas être appelée pendant un {@link #drain(ItemSender)} (elle décalerait les éléments que le drain s'apprête à remplacer) : l'appelant doit s'en assurer.
+	 *
+	 * @param matcher sélectionne les éléments à supprimer
+	 * @return le nombre d'éléments supprimés
+	 */
+	public int remove(ItemMatcher matcher) {
+		synchronized (LOCK) {
+			JSONArray queue = load();
+			JSONArray kept = new JSONArray();
+			int removed = 0;
+			for (int i = 0; i < queue.length(); i++) {
+				JSONObject item = queue.optJSONObject(i);
+				if (null != item && matcher.matches(item)) {
+					removed++;
+				} else {
+					kept.put(queue.opt(i));
+				}
+			}
+			if (removed > 0) {
+				save(kept);
+				Log.d(TAG, "[" + name + "] " + removed + " item(s) supprimé(s)");
+			}
+			return removed;
 		}
 	}
 
@@ -184,6 +226,7 @@ public class PendingJsonQueue {
 			SendOutcome outcome = sender.send(item);
 			if (SendOutcome.Type.RETRY == outcome.type) {
 				retry = true;
+				markAsRetried(item, outcome.reason);
 				updated.add(item);
 			} else if (SendOutcome.Type.REJECTED == outcome.type) {
 				markAsRejected(item, outcome.reason);
@@ -207,6 +250,18 @@ public class PendingJsonQueue {
 			}
 		} catch (JSONException e) {
 			Log.e(TAG, "impossible de marquer l'élément refusé : " + e.getMessage());
+		}
+	}
+
+	private static void markAsRetried(JSONObject item, String reason) {
+		try {
+			item.put(KEY_ATTEMPTS, item.optInt(KEY_ATTEMPTS, 0) + 1);
+			item.put(KEY_LAST_ATTEMPT_AT, System.currentTimeMillis());
+			if (null != reason) {
+				item.put(KEY_LAST_ERROR, reason);
+			}
+		} catch (JSONException e) {
+			Log.e(TAG, "impossible de tracer l'échec de l'élément : " + e.getMessage());
 		}
 	}
 

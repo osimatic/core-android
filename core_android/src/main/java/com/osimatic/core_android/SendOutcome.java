@@ -35,4 +35,9 @@ public final class SendOutcome {
 	public static SendOutcome retry() {
 		return new SendOutcome(Type.RETRY, null);
 	}
+
+	/** Échec temporaire avec sa cause (conservée sur l'élément dans {@link PendingJsonQueue#KEY_LAST_ERROR}). */
+	public static SendOutcome retry(String reason) {
+		return new SendOutcome(Type.RETRY, reason);
+	}
 }
