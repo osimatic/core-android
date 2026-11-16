@@ -43,4 +43,11 @@ public class Json {
 	public static boolean getBoolean(JSONObject json, String key, boolean defaultValue) throws JSONException {
 		return json.has(key) && !json.isNull(key) ? json.getBoolean(key) : defaultValue;
 	}
+	
+	/** Écrit la valeur uniquement si elle n'est ni null ni vide (la clé reste absente sinon). */
+	public static void putIfNotEmpty(JSONObject json, String key, String value) throws JSONException {
+		if (null != value && !value.isEmpty()) {
+			json.put(key, value);
+		}
+	}
 }
