@@ -159,6 +159,20 @@ public class DateTime {
 	}
 
 	/**
+	 * Formats an SQL date string ({@code yyyy-MM-dd}) as a short localized date, computed in UTC because a date has no time zone.
+	 *
+	 * @param sqlDate an SQL date string (e.g. {@code "1990-03-25"}); must not be {@code null}
+	 * @param locale  the locale to use for formatting; must not be {@code null}
+	 * @return a short localized date string (e.g. {@code "25/03/1990"}), or {@code null} if parsing fails
+	 * @see #formatDateShort(Calendar, Locale, String)
+	 * @see <a href="https://developer.android.com/reference/java/text/SimpleDateFormat">SimpleDateFormat — Android Developers</a>
+	 */
+	public static String formatSqlDateShort(String sqlDate, Locale locale) {
+		Calendar calendar = parse(sqlDate + " 00:00:00");
+		return null != calendar ? formatDateShort(calendar, locale, "UTC") : null;
+	}
+
+	/**
 	 * Formats the time part of the given calendar as a localized time string.
 	 *
 	 * @param calendar the calendar to format; must not be {@code null}
